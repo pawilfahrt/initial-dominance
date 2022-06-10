@@ -62,15 +62,17 @@ summary.tablefunc <- function(mod) {
 }
 
 
-dominant_pop <- read_csv('./Data/Dominants-through-time_2022-02-23.csv')
+dominant_pop <- read_csv('./Data/Dominants-through-time_2022-05-26.csv')
 
-dom_comm <- read_csv('./Data/RAC-subordinate_2022-03-14.csv')
+dom_comm <- read_csv('./Data/RAC-subordinate_2022-05-26.csv')
 
 
 dominant_pop
 
 dominant_pop$local_lifespan <- gsub('ANNUAL','Annual',dominant_pop$local_lifespan)
 dominant_pop$local_lifespan <- gsub('PERENNIAL','Perennial',dominant_pop$local_lifespan)
+
+dominant_pop <- filter(dominant_pop, site_code != 'cereep.fr')
 
 ######## Decay of cover predicting cover over time (relative) ####
 R2out <- NULL
@@ -130,7 +132,6 @@ gg_cover_year_coef
 gg_cover_cover <- plot_grid(gg_cover_year_R2,gg_cover_year_coef, ncol = 2,rel_widths = c(1, 1.25))
 gg_cover_cover
 
-setwd("/Users/wilf0020/Library/Mobile Documents/com~apple~CloudDocs/Documents/NutNet manuscripts/Initial dominance")
 
 # ggsave(paste0('Graphs/cover-v-cover-over-time_',Sys.Date(),'.png'),
 #        gg_cover_cover, width = 12, height = 8, units = "in", dpi = 600)
@@ -162,17 +163,25 @@ dominant_pop$cov_scale <- scale_col(dominant_pop$initial_rel_cover)
 
 dominant_pop <- dominant_pop %>% filter(!year_trt %in% c(0,14)) #remove pre-treatment year and year 14 which has only 1 site currently
 
+unique(dominant_pop$site_code[is.na(dominant_pop$MAP_v2)])
 
+## filling in msla and cedr with neighboring sites
+
+dominant_pop$MAP_v2[dominant_pop$site_code=='cedr.us'] <- unique(dominant_pop$MAP_v2[dominant_pop$site_code=='cdcr.us'])
+dominant_pop$MAP_VAR_v2[dominant_pop$site_code=='cedr.us'] <- unique(dominant_pop$MAP_VAR_v2[dominant_pop$site_code=='cdcr.us'])
+
+dominant_pop$MAP_v2[dominant_pop$site_code %in% c('msla_2.us','msla_3.us')] <- unique(dominant_pop$MAP_v2[dominant_pop$site_code=='msla.us'])
+dominant_pop$MAP_VAR_v2[dominant_pop$site_code %in% c('msla_2.us','msla_3.us')] <- unique(dominant_pop$MAP_VAR_v2[dominant_pop$site_code=='msla.us'])
 
 
 cor(dominant_pop[,c('ppt_scale','ppt_var_scale','site_richness')])
 cor(dominant_pop[,c('ppt_scale','ppt_var_scale','rich_scale','cov_scale','plotfreq')])
 
-ggsave(paste0('Graphs/FigS1-predictor-corr_',Sys.Date(),'.png'),
-       ggpairs(dominant_pop[,c('initial_rel_cover','site_richness','MAP_v2','MAP_VAR_v2')],
-        columnLabels = c('Initial\nRelative Cover','Site Richness','Mean Annual\nPrecipitation','CV of MAP'),
-        axisLabels="none"),
-       width = 10, height = 10)
+# ggsave(paste0('Graphs/FigS1-predictor-corr_',Sys.Date(),'.png'),
+#        ggpairs(dominant_pop[,c('initial_rel_cover','site_richness','MAP_v2','MAP_VAR_v2')],
+#         columnLabels = c('Initial\nRelative Cover','Site Richness','Mean Annual\nPrecipitation','CV of MAP'),
+#         axisLabels="none"),
+#        width = 10, height = 10)
 
 pairs(dominant_pop[,c('initial_rel_cover','site_richness','MAP_v2','MAP_VAR_v2')], pch = 21,  cex = 1,
       bg = 'cadetblue3', col = 'black',
@@ -222,15 +231,17 @@ cor(dominant_pop[,c('MAP_v2','site_richness','MAP_VAR_v2')])
 r.squaredGLMM(mod_rank)
 # 
 # R2m       R2c
-# [1,] 0.1692055 0.5770746
+# [1,] 0.1663858 0.5889369
 
 # write_csv(rank_table,
-#           paste0('/Users/wilf0020/Library/Mobile Documents/com~apple~CloudDocs/Documents/NutNet manuscripts/Initial dominance/Tables/rank-decay-table_',
+#           paste0('./Tables/rank-decay-table_',
 #                  Sys.Date(),'.csv'))
 
 ### lifespan effect
 
 #### graphing rank decay ####
+
+### NPK+fence not sig
 
 rank_life_emm <- data.frame(summary(emmeans(mod_rank, pairwise ~ NPK * Fence | local_lifespan * year_trt,
                                             at = list(year_trt = seq(from = 1, to = 13, by = 1)),
@@ -243,17 +254,19 @@ rank_life_emm <- rank_life_emm %>%
                                if_else(NPK == 1 & Fence == 0, 'NPK',
                                        if_else(NPK == 1 & Fence == 1, 'NPK+Fence',NULL)))))
 
-
+rank_life_emm$sig <- ifelse(rank_life_emm$trt == 'NPK+Fence','No','Yes')
 
 gg_rank_year_life_trt <- ggplot(rank_life_emm, aes(x = year_trt, y = emmean, col = trt)) +
   geom_jitter(data = dominant_pop, aes(x=year_trt, y = perc_rank),  width=0.2, alpha = 0.8, col = 'grey90') +
-  geom_ribbon(aes(ymin = lower.CL,ymax= upper.CL,fill=trt),alpha=0.35,color=NA) +
-  geom_smooth(aes(col = trt),method='lm', size = 3, se = FALSE) +
+  geom_ribbon(aes(ymin = lower.CL,ymax= upper.CL,fill=trt),alpha=0.15,color=NA) +
+  #geom_line(aes(group = trt), size = 2, color= 'black') +
+  geom_line(aes(group = trt, linetype = sig), size = 1.8) +
   guides(color = guide_legend(title = "Treatment"), fill = guide_legend(title = "Treatment")) +
   ylab('Rank percentage') + xlab('Year after treatment') +
   #scale_color_brewer(palette = "Set1") +
   scale_color_manual(values = ctrl_pal) +
   scale_fill_manual(values = ctrl_pal) +
+  scale_linetype_manual(values = c('dashed','solid'), guide = 'none') +
   facet_grid(~local_lifespan)
 gg_rank_year_life_trt
 
@@ -287,9 +300,9 @@ rank_init_emm$lower.CL <- ifelse(rank_init_emm$lower.CL < 0, 0, rank_init_emm$lo
 
 gg_rank_year_init_trt <- ggplot(rank_init_emm, aes(x = year_trt, y = emmean, col = trt)) +
   #geom_jitter(data = dominant_pop, aes(x=year_trt, y = perc_rank),  width=0.1, alpha = 0.8, col = 'grey90') +
-  geom_ribbon(aes(ymin = lower.CL,ymax= upper.CL,fill=trt),alpha=0.35,color=NA) +
-  geom_line(aes(group = trt), size = 3.2, color= 'black') +
-  geom_line(aes(group = trt), size = 3) +
+  geom_ribbon(aes(ymin = lower.CL,ymax= upper.CL,fill=trt),alpha=0.25,color=NA) +
+  geom_line(aes(group = trt), size = 2, color= 'black') +
+  geom_line(aes(group = trt), size = 1.8) +
   guides(color = guide_legend(title = "Treatment"), fill = guide_legend(title = "Treatment")) +
   ylab('Rank percentage') + xlab('Year after treatment') +
   #scale_color_brewer(palette = "Set1") +
@@ -303,6 +316,7 @@ gg_rank_year_init_trt
 # ggsave(paste0('Graphs/Presentation/rank-decay-initcover_',Sys.Date(),'.png'),
 #        gg_rank_year_init_trt, width = 12, height = 8, units = "in", dpi = 600)
 
+rank_table
 
 rank_rich_emm <- data.frame(summary(emmeans(mod_rank, pairwise ~ NPK * Fence | site_richness * year_trt,
                                             at = list(site_richness = seq(from = 25, to = 125, by = 100),
@@ -316,6 +330,9 @@ rank_rich_emm <- rank_rich_emm %>%
                                if_else(NPK == 1 & Fence == 0, 'NPK',
                                        if_else(NPK == 1 & Fence == 1, 'NPK+Fence',NULL)))))
 
+rank_rich_emm$sig <- ifelse(rank_rich_emm$trt %in% c('Fence','NPK+Fence'),'No','Yes')
+
+
 rank_rich_emm$richness <- factor(ifelse(rank_rich_emm$site_richness == 25, 'Low site richness','High site richness'), levels = c('Low site richness','High site richness'))
 rank_rich_emm$upper.CL <- ifelse(rank_rich_emm$upper.CL > 1.05, 1.05, rank_rich_emm$upper.CL)
 rank_rich_emm$lower.CL <- ifelse(rank_rich_emm$lower.CL < 0, 0, rank_rich_emm$lower.CL)
@@ -323,14 +340,15 @@ rank_rich_emm$lower.CL <- ifelse(rank_rich_emm$lower.CL < 0, 0, rank_rich_emm$lo
 
 gg_rank_year_rich_trt <- ggplot(rank_rich_emm, aes(x = year_trt, y = emmean, col = trt)) +
   #geom_jitter(data = dominant_pop, aes(x=year_trt, y = perc_rank),  width=0.1, alpha = 0.8, col = 'grey90') +
-  geom_ribbon(aes(ymin = lower.CL,ymax= upper.CL,fill=trt),alpha=0.35,color=NA) +
-  geom_line(aes(group = trt), size = 3.2, color= 'black') +
-  geom_line(aes(group = trt), size = 3) +
+  geom_ribbon(aes(ymin = lower.CL,ymax= upper.CL,fill=trt),alpha=0.25,color=NA) +
+  #geom_line(aes(group = trt), size = 3.2, color= 'black') +
+  geom_line(aes(group = trt, linetype = sig), size = 1.8) +
   guides(color = guide_legend(title = "Treatment"), fill = guide_legend(title = "Treatment")) +
   ylab('Rank percentage') + xlab('Year after treatment') +
   #scale_color_brewer(palette = "Set1") +
   scale_color_manual(values = ctrl_pal) +
   scale_fill_manual(values = ctrl_pal) +
+  scale_linetype_manual(values = c('dashed','solid'), guide = 'none') +
   ylim(0,1.05) +
   facet_wrap(~richness)
 
@@ -351,6 +369,9 @@ rank_map_emm <- rank_map_emm %>%
                                if_else(NPK == 1 & Fence == 0, 'NPK',
                                        if_else(NPK == 1 & Fence == 1, 'NPK+Fence',NULL)))))
 
+rank_map_emm$sig <- ifelse(rank_map_emm$trt %in% c('NPK','NPK+Fence'),'No','Yes')
+
+
 rank_map_emm$ppt <- factor(ifelse(rank_map_emm$MAP_v2 == 500, 'Low MAP','High MAP'), levels = c('Low MAP','High MAP'))
 # rank_map_emm$upper.CL <- ifelse(rank_map_emm$upper.CL > 1.05, 1.05, rank_map_emm$upper.CL)
 rank_map_emm$lower.CL <- ifelse(rank_map_emm$lower.CL < 0, 0, rank_map_emm$lower.CL)
@@ -358,14 +379,15 @@ rank_map_emm$lower.CL <- ifelse(rank_map_emm$lower.CL < 0, 0, rank_map_emm$lower
 
 gg_rank_year_ppt_trt <- ggplot(rank_map_emm, aes(x = year_trt, y = emmean, col = trt)) +
   #geom_jitter(data = dominant_pop, aes(x=year_trt, y = perc_rank),  width=0.1, alpha = 0.8, col = 'grey90') +
-  geom_ribbon(aes(ymin = lower.CL,ymax= upper.CL,fill=trt),alpha=0.35,color=NA) +
-  geom_line(aes(group = trt), size = 3.2, color= 'black') +
-  geom_line(aes(group = trt), size = 3) +
+  geom_ribbon(aes(ymin = lower.CL,ymax= upper.CL,fill=trt),alpha=0.25,color=NA) +
+  #geom_line(aes(group = trt), size = 3.2, color= 'black') +
+  geom_line(aes(group = trt, linetype = sig), size = 1.8) +
   guides(color = guide_legend(title = "Treatment"), fill = guide_legend(title = "Treatment")) +
   ylab('Rank percentage') + xlab('Year after treatment') +
   #scale_color_brewer(palette = "Set1") +
   scale_color_manual(values = ctrl_pal) +
   scale_fill_manual(values = ctrl_pal) +
+  scale_linetype_manual(values = c('dashed','solid'), guide = 'none') +
   ylim(0,1.05) +
   facet_wrap(~ppt)
 
@@ -384,6 +406,9 @@ rank_pptvar_emm <- rank_pptvar_emm %>%
                                if_else(NPK == 1 & Fence == 0, 'NPK',
                                        if_else(NPK == 1 & Fence == 1, 'NPK+Fence',NULL)))))
 
+rank_pptvar_emm$sig <- ifelse(rank_pptvar_emm$trt %in% c('Fence','NPK+Fence'),'No','Yes')
+
+
 rank_pptvar_emm$pptvar <- factor(ifelse(rank_pptvar_emm$MAP_VAR_v2 == 20, 'Low PPT Variation','High PPT Variation'), levels = c('Low PPT Variation','High PPT Variation'))
 # rank_pptvar_emm$upper.CL <- ifelse(rank_pptvar_emm$upper.CL > 1.05, 1.05, rank_pptvar_emm$upper.CL)
  rank_pptvar_emm$lower.CL <- ifelse(rank_pptvar_emm$lower.CL < 0, 0, rank_pptvar_emm$lower.CL)
@@ -392,13 +417,14 @@ rank_pptvar_emm$pptvar <- factor(ifelse(rank_pptvar_emm$MAP_VAR_v2 == 20, 'Low P
 gg_rank_year_pptvar_trt <- ggplot(rank_pptvar_emm, aes(x = year_trt, y = emmean, col = trt)) +
   #geom_jitter(data = dominant_pop, aes(x=year_trt, y = perc_rank),  width=0.1, alpha = 0.8, col = 'grey90') +
   geom_ribbon(aes(ymin = lower.CL,ymax= upper.CL,fill=trt),alpha=0.35,color=NA) +
-  geom_line(aes(group = trt), size = 3.2, color= 'black') +
-  geom_line(aes(group = trt), size = 3) +
+  #geom_line(aes(group = trt), size = 3.2, color= 'black') +
+  geom_line(aes(group = trt, linetype = sig), size = 1.8) +
   guides(color = guide_legend(title = "Treatment"), fill = guide_legend(title = "Treatment")) +
   ylab('Rank percentage') + xlab('Year after treatment') +
   #scale_color_brewer(palette = "Set1") +
   scale_color_manual(values = ctrl_pal) +
   scale_fill_manual(values = ctrl_pal) +
+  scale_linetype_manual(values = c('dashed','solid'), guide = 'none') +
   ylim(0,1.05) +
   facet_wrap(~pptvar)
 
@@ -441,9 +467,9 @@ Fig2.rank <- grid.arrange(gg_rank_init,blankPlot,
              left = textGrob("Rank percentage", rot = 90, gp=gpar(fontsize=24)),
              bottom = textGrob("Year after treatment", gp=gpar(fontsize=24)))
 
-save_plot(paste0('Graphs/Fig2-rank-time_',Sys.Date(),'.png'),
-          Fig2.rank,
-          base_height = 8, base_width = 12)
+# save_plot(paste0('Graphs/Fig2-rank-time_',Sys.Date(),'.png'),
+#           Fig2.rank,
+#           base_height = 8, base_width = 12)
 
 ## defining inertia (logit model) ####
 
