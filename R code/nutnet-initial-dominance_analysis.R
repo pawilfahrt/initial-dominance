@@ -62,9 +62,9 @@ summary.tablefunc <- function(mod) {
 }
 
 
-dominant_pop <- read_csv('./Data/Dominants-through-time_2022-05-26.csv')
+dominant_pop <- read_csv('./Data/Dominants-through-time_2022-07-20.csv')
 
-dom_comm <- read_csv('./Data/RAC-subordinate_2022-05-26.csv')
+dom_comm <- read_csv('./Data/RAC-subordinate_2022-07-20.csv')
 
 
 dominant_pop
@@ -72,27 +72,27 @@ dominant_pop
 dominant_pop$local_lifespan <- gsub('ANNUAL','Annual',dominant_pop$local_lifespan)
 dominant_pop$local_lifespan <- gsub('PERENNIAL','Perennial',dominant_pop$local_lifespan)
 
-dominant_pop <- filter(dominant_pop, site_code != 'cereep.fr')
+dominant_pop <- filter(dominant_pop, !(site_code == 'cereep.fr' & trt %in% c('NPK','NPK+Fence')))
 
 ######## Decay of cover predicting cover over time (relative) ####
-R2out <- NULL
-
-for(i in 1:10){
-  dom_temp <- dominant_pop %>%
-    filter(year_trt == i) # %>%
-    #filter(max_year > 10)
-  for(j in unique(dominant_pop$trt)) {
-    trt_temp <- dom_temp[dom_temp$trt == j,]
-    mod_temp_rel <- lmer(cover ~ initial_rel_cover + (1|site_code), data = trt_temp)
-    coef <- summary(mod_temp_rel)$coefficients[2,1]
-    R2_temp <- partR2(mod_temp_rel, data = dom_temp, R2_type = "marginal", nboot = 10)
-    R2_df <- data.frame(R2_temp$R2,trt = j, year_trt = i,coef = coef)
-    R2out <- rbind(R2out,R2_df)
-  }
-  }
-
-R2out
-## direction of effect is always positive
+# R2out <- NULL
+# 
+# for(i in 1:10){
+#   dom_temp <- dominant_pop %>%
+#     filter(year_trt == i) # %>%
+#     #filter(max_year > 10)
+#   for(j in unique(dominant_pop$trt)) {
+#     trt_temp <- dom_temp[dom_temp$trt == j,]
+#     mod_temp_rel <- lmer(cover ~ initial_rel_cover + (1|site_code), data = trt_temp)
+#     coef <- summary(mod_temp_rel)$coefficients[2,1]
+#     R2_temp <- partR2(mod_temp_rel, data = dom_temp, R2_type = "marginal", nboot = 10)
+#     R2_df <- data.frame(R2_temp$R2,trt = j, year_trt = i,coef = coef)
+#     R2out <- rbind(R2out,R2_df)
+#   }
+#   }
+# 
+# R2out
+# ## direction of effect is always positive
 
 display.brewer.pal(11, "Blues")
 brewer.pal(11, "Blues")
@@ -100,37 +100,37 @@ brewer.pal(11, "Blues")
 pos <- position_dodge(0.5)
 
 ctrl_pal <- c('black',"#D53E4F","#6BAED6","#5E4FA2")
-
-gg_cover_year_R2 <- ggplot(R2out, aes(x=year_trt,y=estimate,col = trt)) +
-  #geom_ribbon(aes(ymin = CI_lower,ymax= CI_upper,fill=trt),alpha=0.15,color='white') +
-  #geom_errorbar(aes(group = trt,ymin = CI_lower,ymax= CI_upper),alpha =0.5,color='black',position = pos, width = 0.3,size=1.05) +
-  geom_errorbar(aes(ymin = CI_lower,ymax= CI_upper),alpha = 0.3,position = pos, width = 0.3) +
-  geom_line(position = pos,size=1.2,alpha=0.9) +
-  geom_point(aes(group = trt),position = pos,size=1.7,color='black') +
-  geom_point(position = pos,size = 1.4) +
-  scale_color_manual(values = ctrl_pal,guide='none') +
-  #guides(color = guide_legend(title = "Treatment")) +
-  xlab('Year post-treatment') + ylab('Initial cover (pseudo-R2)')
-
-gg_cover_year_R2
-#
-#
-#
-gg_cover_year_coef <- ggplot(R2out, aes(x=year_trt,y=coef,col = trt)) +
-  #geom_ribbon(aes(ymin = CI_lower,ymax= CI_upper,fill=trt),alpha=0.15,color='white') +
-  #geom_errorbar(aes(group = trt,ymin = CI_lower,ymax= CI_upper),alpha =0.5,color='black',position = pos, width = 0.3,size=1.05) +
-  #geom_errorbar(aes(ymin = CI_lower,ymax= CI_upper),alpha = 0.3,position = pos, width = 0.3) +
-  geom_line(position = pos,size=1.2,alpha=0.9) +
-  geom_point(aes(group = trt),position = pos,size=1.7,color='black') +
-  geom_point(position = pos,size = 1.4) +
-  scale_color_manual(values = ctrl_pal) +
-  guides(color = guide_legend(title = "Treatment")) +
-  xlab('Year post-treatment') + ylab('Initial cover (coefficient)')
-
-gg_cover_year_coef
-
-gg_cover_cover <- plot_grid(gg_cover_year_R2,gg_cover_year_coef, ncol = 2,rel_widths = c(1, 1.25))
-gg_cover_cover
+# 
+# gg_cover_year_R2 <- ggplot(R2out, aes(x=year_trt,y=estimate,col = trt)) +
+#   #geom_ribbon(aes(ymin = CI_lower,ymax= CI_upper,fill=trt),alpha=0.15,color='white') +
+#   #geom_errorbar(aes(group = trt,ymin = CI_lower,ymax= CI_upper),alpha =0.5,color='black',position = pos, width = 0.3,size=1.05) +
+#   geom_errorbar(aes(ymin = CI_lower,ymax= CI_upper),alpha = 0.3,position = pos, width = 0.3) +
+#   geom_line(position = pos,size=1.2,alpha=0.9) +
+#   geom_point(aes(group = trt),position = pos,size=1.7,color='black') +
+#   geom_point(position = pos,size = 1.4) +
+#   scale_color_manual(values = ctrl_pal,guide='none') +
+#   #guides(color = guide_legend(title = "Treatment")) +
+#   xlab('Year post-treatment') + ylab('Initial cover (pseudo-R2)')
+# 
+# gg_cover_year_R2
+# #
+# #
+# #
+# gg_cover_year_coef <- ggplot(R2out, aes(x=year_trt,y=coef,col = trt)) +
+#   #geom_ribbon(aes(ymin = CI_lower,ymax= CI_upper,fill=trt),alpha=0.15,color='white') +
+#   #geom_errorbar(aes(group = trt,ymin = CI_lower,ymax= CI_upper),alpha =0.5,color='black',position = pos, width = 0.3,size=1.05) +
+#   #geom_errorbar(aes(ymin = CI_lower,ymax= CI_upper),alpha = 0.3,position = pos, width = 0.3) +
+#   geom_line(position = pos,size=1.2,alpha=0.9) +
+#   geom_point(aes(group = trt),position = pos,size=1.7,color='black') +
+#   geom_point(position = pos,size = 1.4) +
+#   scale_color_manual(values = ctrl_pal) +
+#   guides(color = guide_legend(title = "Treatment")) +
+#   xlab('Year post-treatment') + ylab('Initial cover (coefficient)')
+# 
+# gg_cover_year_coef
+# 
+# gg_cover_cover <- plot_grid(gg_cover_year_R2,gg_cover_year_coef, ncol = 2,rel_widths = c(1, 1.25))
+# gg_cover_cover
 
 
 # ggsave(paste0('Graphs/cover-v-cover-over-time_',Sys.Date(),'.png'),
@@ -161,18 +161,9 @@ dominant_pop$cov_scale <- scale_col(dominant_pop$initial_rel_cover)
 
 #remove year 0
 
-dominant_pop <- dominant_pop %>% filter(!year_trt %in% c(0,14)) #remove pre-treatment year and year 14 which has only 1 site currently
+dominant_pop <- dominant_pop %>% filter(!year_trt %in% c(0)) #remove pre-treatment year
 
 unique(dominant_pop$site_code[is.na(dominant_pop$MAP_v2)])
-
-## filling in msla and cedr with neighboring sites
-
-dominant_pop$MAP_v2[dominant_pop$site_code=='cedr.us'] <- unique(dominant_pop$MAP_v2[dominant_pop$site_code=='cdcr.us'])
-dominant_pop$MAP_VAR_v2[dominant_pop$site_code=='cedr.us'] <- unique(dominant_pop$MAP_VAR_v2[dominant_pop$site_code=='cdcr.us'])
-
-dominant_pop$MAP_v2[dominant_pop$site_code %in% c('msla_2.us','msla_3.us')] <- unique(dominant_pop$MAP_v2[dominant_pop$site_code=='msla.us'])
-dominant_pop$MAP_VAR_v2[dominant_pop$site_code %in% c('msla_2.us','msla_3.us')] <- unique(dominant_pop$MAP_VAR_v2[dominant_pop$site_code=='msla.us'])
-
 
 cor(dominant_pop[,c('ppt_scale','ppt_var_scale','site_richness')])
 cor(dominant_pop[,c('ppt_scale','ppt_var_scale','rich_scale','cov_scale','plotfreq')])
@@ -189,8 +180,6 @@ pairs(dominant_pop[,c('initial_rel_cover','site_richness','MAP_v2','MAP_VAR_v2')
       lower.panel=NULL)
 
 #### Model of rank decay ####
-
-
 
 mod_rank <- lme(perc_rank ~ year_trt * initial_rel_cover * NPK * Fence +
                                    local_lifespan * year_trt * NPK * Fence  +
@@ -433,25 +422,28 @@ gg_rank_year_pptvar_trt
 #### Fig 2 ####
 #### stitch them together
 
-rank_legend <- get_legend(gg_rank_year_pptvar_trt)
+rank_legend <- get_legend(gg_rank_year_pptvar_trt + 
+                            theme(legend.direction = "horizontal", legend.box = "horizontal"))
 
-gg_rank_init <- gg_rank_year_init_trt + theme(legend.position="none", axis.title.y=element_blank(),axis.title.x=element_blank(),axis.text.x=element_blank(),
-                                              plot.tag.position = c(0.08,1)) + 
-  labs(tag = 'A')
+gg_rank_init <- gg_rank_year_init_trt + theme(legend.position="none", axis.title.y=element_blank(),axis.title.x=element_blank())
+                                              # plot.tag.position = c(0.08,1)) + 
+                                              # labs(tag = 'A')
 gg_rank_life <- gg_rank_year_life_trt + theme(legend.position="none", axis.title.y=element_blank(),
-                                              axis.title.x=element_blank(),axis.text.x=element_blank(),
-                                              plot.tag.position = c(0.08,1)) + 
-  labs(tag = 'B')
+                                              axis.title.x=element_blank(),axis.text.x=element_blank())
+  #                                             plot.tag.position = c(0.08,1)) + 
+  # labs(tag = 'B')
 # gg_rank_freq <- gg_rank_year_life_trt + theme(legend.position="none")
 gg_rank_rich <- gg_rank_year_rich_trt + 
-  theme(legend.position="none",axis.title.y=element_blank(), axis.text.y=element_blank(),axis.title.x=element_blank(),axis.text.x=element_blank()) + 
-  labs(tag = 'C')
-gg_rank_ppt <- gg_rank_year_ppt_trt + theme(legend.position="none",axis.title.y=element_blank(),axis.title.x=element_blank(),
-                                            plot.tag.position = c(0.08,1)) + 
-  
-  labs(tag = 'D')
-gg_rank_pptvar <- gg_rank_year_pptvar_trt + theme(legend.position="none",axis.title.y=element_blank(),axis.text.y=element_blank(),axis.title.x=element_blank())+ 
-  labs(tag = 'E')
+  theme(legend.position="none",axis.title.y=element_blank(), axis.text.y=element_blank(),axis.title.x=element_blank(),axis.text.x=element_blank()) 
+# + 
+  #labs(tag = 'C')
+gg_rank_ppt <- gg_rank_year_ppt_trt + theme(legend.position="none",axis.title.y=element_blank(),axis.title.x=element_blank())
+                                            # plot.tag.position = c(0.08,1)) 
+# + 
+#   
+#   labs(tag = 'D')
+gg_rank_pptvar <- gg_rank_year_pptvar_trt + theme(legend.position="none",axis.title.y=element_blank(),axis.text.y=element_blank(),axis.title.x=element_blank()) 
+  #labs(tag = 'E')
 
 blankPlot <- ggplot()+geom_blank(aes(1,1)) + 
   cowplot::theme_nothing()
@@ -467,8 +459,30 @@ Fig2.rank <- grid.arrange(gg_rank_init,blankPlot,
              left = textGrob("Rank percentage", rot = 90, gp=gpar(fontsize=24)),
              bottom = textGrob("Year after treatment", gp=gpar(fontsize=24)))
 
+
+ggdraw() +
+  draw_plot(gg_rank_init, x = 0, y = 0, width = .5, height = .5) +
+  draw_plot(gg_rank_life, x = .5, y = 0.25, width = .25, height = .25) +
+  draw_plot(gg_rank_rich, x = .75, y = 0.25, width = .25, height = 0.25) +
+  draw_plot(gg_rank_ppt, x = .5, y = 0, width = .25, height = 0.25) +
+  draw_plot(gg_rank_pptvar, x = .75, y = 0, width = .25, height = 0.25) 
+
+
+Fig2 <- ggdraw() +
+  draw_plot(rank_legend, x = -0.3, y = 0.95, width = 1, height = .05) +
+  draw_plot(gg_rank_init, x = 0.03, y = 0.52, width = .97, height = .43) +
+  draw_plot(gg_rank_life, x = 0.03, y = 0.27, width = .5, height = .25) +
+  draw_plot(gg_rank_rich, x = .53, y = 0.27, width = .47, height = 0.25) +
+  draw_plot(gg_rank_ppt, x = 0.03, y = 0.02, width = .5, height = 0.25) +
+  draw_plot(gg_rank_pptvar, x = .53, y = 0.02, width = .47, height = 0.25)+
+  draw_plot_label(label = c("A", "B", "C", "D",'E'), size = 15,
+                  x = c(0.1, 0.1, 0.54,0.1,0.54), y = c(0.89, 0.46, 0.46,0.21,0.21)) + 
+  draw_label("Years after treatment", colour = "black", size = 25, x = 0.5, y = 0.02) +
+  draw_label("Rank Percentile", colour = "black", size = 25, angle = 90, x = 0.01, y = 0.5)
+
+
 # save_plot(paste0('Graphs/Fig2-rank-time_',Sys.Date(),'.png'),
-#           Fig2.rank,
+#           Fig2,
 #           base_height = 8, base_width = 12)
 
 ## defining inertia (logit model) ####
@@ -484,47 +498,47 @@ dom_pop_yr <- dominant_pop %>%
   filter(year_trt <= yr_cut)
 
 length(unique(dom_pop_yr$site_code))
-
+#24
 
 ### fit logit model to all species across time and extract first year where confidence interval doesn't include 1
 # 
-# inertia_mod <- glmer(perc_rank ~  year_trt +
-#                                       (1|site_code/plot), 
-#                                     data = dom_pop_yr[dom_pop_yr$year_trt != 0,],
-#                                     family = binomial, control = glmerControl(optimizer = "bobyqa",
-#                                                                               optCtrl=list(maxfun=2e6)))
-# 
-# 
-# dom_pop_yr_pred  <- dom_pop_yr[dom_pop_yr$year_trt != 0,] %>% 
-#   bind_cols(.,predictInterval(inertia_mod,dom_pop_yr[dom_pop_yr$year_trt != 0,],
-#                 level = 0.90, n.sims = 1000,
-#                 stat = "median", type="probability",
-#                 include.resid.var = TRUE))
-# 
-# 
-# hist(dom_pop_yr_pred$upr, nclass=100)
-# 
-# 
-# ggplot(dom_pop_yr_pred, aes(x=perc_rank,y=upr,col=year_trt)) + geom_point() + geom_hline(yintercept = 0.99) +
-#   xlab('Rank percentile') + ylab('Upper CI (logit model estimate)')
-# 
-# # first try - upper bound is arbitrary still :(
-# inertia_resistance <- dom_pop_yr_pred %>% 
-#   group_by(site_code,plot) %>% 
-#   arrange(site_code,plot,year_trt) %>% 
-#   slice(if(any(upr < 0.99)) which.max(upr < 0.99) else which.max(year_trt == max(year_trt))) %>% 
-#   mutate(inertia_mod = if_else(perc_rank == 1, year_trt, year_trt-1)) %>% 
-#   left_join(dom_pop_yr_pred %>% 
-#               group_by(site_code,plot) %>% 
-#               summarize(resistance = min(perc_rank)), 
-#             by = c('site_code','plot'))
-# 
-# hist(inertia_resistance$inertia_mod, xlab = 'Inertia: Year to rank loss')
-# hist(inertia_resistance$resistance, xlab = 'Resistance')
-# 
-# cor(inertia_resistance[,c('inertia_mod','resistance')])
-# 
-# plot(inertia_mod~resistance,data=inertia_resistance)
+inertia_mod <- glmer(perc_rank ~  year_trt +
+                                      (1|site_code/plot),
+                                    data = dom_pop_yr[dom_pop_yr$year_trt != 0,],
+                                    family = binomial, control = glmerControl(optimizer = "bobyqa",
+                                                                              optCtrl=list(maxfun=2e6)))
+
+
+dom_pop_yr_pred  <- dom_pop_yr[dom_pop_yr$year_trt != 0,] %>%
+  bind_cols(.,predictInterval(inertia_mod,dom_pop_yr[dom_pop_yr$year_trt != 0,],
+                level = 0.90, n.sims = 1000,
+                stat = "median", type="probability",
+                include.resid.var = TRUE))
+
+
+hist(dom_pop_yr_pred$upr, nclass=100)
+
+
+ggplot(dom_pop_yr_pred, aes(x=perc_rank,y=upr,col=year_trt)) + geom_point() + geom_hline(yintercept = 0.99) +
+  xlab('Rank percentile') + ylab('Upper CI (logit model estimate)')
+
+# first try - upper bound is arbitrary still :(
+inertia_resistance <- dom_pop_yr_pred %>%
+  group_by(site_code,plot) %>%
+  arrange(site_code,plot,year_trt) %>%
+  slice(if(any(upr < 0.99)) which.max(upr < 0.99) else which.max(year_trt == max(year_trt))) %>%
+  mutate(inertia_mod = if_else(perc_rank == 1, year_trt, year_trt-1)) %>%
+  left_join(dom_pop_yr_pred %>%
+              group_by(site_code,plot) %>%
+              summarize(resistance = min(perc_rank)),
+            by = c('site_code','plot'))
+
+hist(inertia_resistance$inertia_mod, xlab = 'Inertia: Year to rank loss')
+hist(inertia_resistance$resistance, xlab = 'Resistance')
+
+cor(inertia_resistance[,c('inertia_mod','resistance')])
+
+plot(inertia_mod~resistance,data=inertia_resistance)
 
 
 ### defining inertia (empirical) ####
@@ -540,6 +554,7 @@ inertia_rank_loss <- dom_pop_yr %>%
 
 ggplot(inertia_rank_loss, aes(x= inertia_first, y=inertia_last)) + geom_jitter()
 ### many species that lose rank in year 1 recover to have rank = 1 in later years.
+
 
 hist(inertia_rank_loss$inertia_last)
 hist(inertia_rank_loss$inertia_first)
@@ -565,8 +580,24 @@ rank_loss_components <- dom_pop_yr %>%
   summarize(resistance = mean(perc_rank)) %>% 
   right_join(inertia_rank_loss,by=c('site_code','plot','Taxon'))
 
-#### correlation of inertia and resistance
+## how does logit model defined inertia compare to empirically defined inertia
 
+iner_res <- inertia_resistance %>% 
+  dplyr::select(site_code, plot, Taxon, inertia_mod, inertia_mod, resistance) %>% 
+  left_join(rank_loss_components, by = c('site_code','plot','Taxon'))
+
+cor(iner_res[!is.na(iner_res$inertia_first),c('resistance.x','resistance.y','inertia_mod','inertia_first','inertia_last')])
+
+#               resistance.x resistance.y inertia_mod inertia_first inertia_last
+# resistance.x     1.0000000    0.9551956   0.9064704     0.6633207    0.6413276
+# resistance.y     0.9551956    1.0000000   0.8907837     0.6236034    0.6958860
+# inertia_mod      0.9064704    0.8907837   1.0000000     0.7306494    0.7263021
+# inertia_first    0.6633207    0.6236034   0.7306494     1.0000000    0.5044110
+# inertia_last     0.6413276    0.6958860   0.7263021     0.5044110    1.0000000
+
+# So the logit model 'peeling away' from 1 is more linked to the minimum rank than time to rank loss. While this appears to best capture both aspects, the overall gain is minimal and the approach is convoluted, so best to drop.
+
+#### correlation of inertia and resistance
 
 summary(lm(rank_loss_components$inertia_last ~ rank_loss_components$resistance)) 
 ##R2 w 10 yrs = 0.50
@@ -927,7 +958,7 @@ gg_res
 
 #### Fig 3 ####
 
-gg_iner_res <- plot_grid(gg_iner,gg_res,ncol = 2,rel_widths = c(0.65,0.35))
+gg_iner_res <- plot_grid(gg_iner,gg_res,ncol = 2,rel_widths = c(0.6,0.4))
 
 gg_iner_res
 
@@ -941,14 +972,65 @@ gg_iner_res
 
 dom_comm
 
-dom_comm_LRR <- dom_comm %>% 
+#following Seabloom 2020 for extracting rates of change in biomass and diversity
+#log tran
+
+dom_comm_10 <- dom_comm %>% 
+  mutate(mass = if_else(is.na(live_mass),unsorted_mass,live_mass)) %>% 
+  mutate(mass.lg = log10(mass), rich.lg = log10(subord_rich), rac.lg = log10(rank_change), yr.lg = log10(year_trt+1)) %>% 
+  filter(site_code %in% dom_pop_yr$site_code, year_trt <= 10)
+  #mutate(LRR_mass = if_else(is.na(live_mass),log(unsorted_mass/ctrl_mass),log(live_mass/ctrl_mass)))
+       
+  dom_comm_10 <- do.call(data.frame, lapply(dom_comm_10, function(x) replace(x, is.infinite(x), NA)))
+         
+# npp.simp <- lme(mass.lg ~ trt*yr.lg, random = ~1|site_code, data=dom_comm_10, na.action=na.omit)
+# summary(npp.simp)
+# #lm.npp2t.big <- lme(mass.lg ~ trt*yr.lg, random = ~1 + yr.lg+trt|site_code/plot, data=dom_comm_10, na.action=na.omit)
+# # does not converge
+# #summary(lm.npp2t.big)
+# 
+# #slightly simpler
+# lm.npp2t.big <- lme(mass.lg ~ trt*yr.lg, random = ~1 + yr.lg+trt|site_code, data=dom_comm_10, na.action=na.exclude)
+# summary(lm.npp2t.big)
+# # converges!
+# anova(npp.simp,lm.npp2t.big)
+# 
+# rich.simp <- lme(rich.lg ~ trt*yr.lg, random = ~1|site_code, data=dom_comm_10, na.action=na.omit)
+# summary(rich.simp)
+# lm.rich.big <- lme(rich.lg ~ trt*yr.lg, random = ~1 + yr.lg+trt|site_code, data=dom_comm_10, na.action=na.exclude)
+# summary(lm.rich.big)
+# anova(rich.simp, lm.rich.big)
+# 
+# rac.simp <- lme(rac.lg ~ trt*yr.lg, random = ~1|site_code, data=dom_comm_10, na.action=na.omit)
+# summary(rac.simp)
+# lm.rac.big <- lme(rac.lg ~ trt*yr.lg, random = ~1 + yr.lg+trt|site_code, data=dom_comm_10, na.action=na.exclude)
+# summary(lm.rac.big)
+# anova(rac.simp, lm.rac.big)
+# 
+# # Get plot level predictions and take site level means
+# dom_comm_10$mass.lg.pred <- predict(lm.npp2t.big)  # live mass
+# dom_comm_10$rich.lg.pred <- predict(lm.rich.big) # subordinate richness
+# dom_comm_10$rac.lg.pred <- predict(lm.rac.big)   # subordinate rank change
+# 
+# # Backtransform to raw data 
+# dom_comm_10$mass.pred <- 10^dom_comm_10$mass.lg.pred
+# dom_comm_10$rich.pred <- 10^dom_comm_10$rich.lg.pred
+# dom_comm_10$rac.pred <- 10^dom_comm_10$rac.lg.pred
+# 
+# 
+# ggplot(dom_comm_10[dom_comm_10$site_code == 'cdcr.us',], aes(x=year_trt,y=mass.pred, col=factor(trt))) + geom_point()
+# ggplot(dom_comm_10[dom_comm_10$site_code == 'cdcr.us',], aes(x=yr.lg,y=mass.lg.pred, col=factor(trt))) + geom_line()
+# 
+# coef(lm.npp2t.big)
+
+dom_comm_LRR <- dom_comm_10 %>% 
   group_by(site_code,year_trt) %>% 
     mutate(ctrl_mass = if_else(is.na(live_mass),mean(unsorted_mass[trt == 'Control'],na.rm=T),mean(live_mass[trt == 'Control'],na.rm=T)),
            ctrl_RAC = mean(rank_change[trt == 'Control'],na.rm=T),
            ctrl_rich = mean(subord_rich[trt == 'Control'],na.rm=T)) %>% 
-    mutate(LRR_mass = if_else(is.na(live_mass),log(unsorted_mass/ctrl_mass),log(live_mass/ctrl_mass)),
-           LRR_RAC = log(rank_change/ctrl_RAC),
-           LRR_rich = log(subord_rich/ctrl_rich)) 
+    mutate(LRR_mass = if_else(is.na(live_mass),log10(unsorted_mass/ctrl_mass),log10(live_mass/ctrl_mass)),
+           LRR_RAC = log10(rank_change/ctrl_RAC),
+           LRR_rich = log10(subord_rich/ctrl_rich)) 
 
 # Replace Inf in data by NA
 dom_comm_LRR <- do.call(data.frame,                      
@@ -958,21 +1040,21 @@ dom_comm_LRR <- do.call(data.frame,
 LRR_mass <- filter(dom_comm_LRR,site_code %in% dom_pop_yr$site_code,year_trt <= yr_cut,!is.na(LRR_mass),!is.infinite(LRR_mass)) %>% 
     split(., ~ site_code + plot) %>% 
     discard(~nrow(.)==0) %>%
-    map(~lm(LRR_mass ~ year_trt - 1, data = .,na.action=na.omit))  %>% 
+    map(~lm(LRR_mass ~ yr.lg - 1, data = .,na.action=na.omit))  %>% 
     map_df(tidy,.id='plot') %>%
     rename(est_bio = estimate)
 
 LRR_rich <- filter(dom_comm_LRR,site_code %in% dom_pop_yr$site_code,year_trt <= yr_cut,!is.na(LRR_rich),!is.infinite(LRR_rich)) %>% 
   split(., ~ site_code + plot) %>% 
   discard(~nrow(.)==0) %>%
-  map(~lm(LRR_rich ~ year_trt - 1, data = .,na.action=na.omit))  %>% 
+  map(~lm(LRR_rich ~ yr.lg - 1, data = .,na.action=na.omit))  %>% 
   map_df(tidy,.id='plot') %>%
   rename(est_rich = estimate)
 
 LRR_rac <- filter(dom_comm_LRR,site_code %in% dom_pop_yr$site_code,year_trt <= yr_cut,!is.na(LRR_RAC),!is.infinite(LRR_RAC)) %>% 
   split(., ~ site_code + plot) %>% 
   discard(~nrow(.)==0) %>%
-  map(~lm(LRR_RAC ~ year_trt - 1, data = .,na.action=na.omit))  %>% 
+  map(~lm(LRR_RAC ~ yr.lg - 1, data = .,na.action=na.omit))  %>% 
   map_df(tidy,.id='plot') %>%
   rename(est_rac = estimate)
 
@@ -990,19 +1072,21 @@ comm_rank_change <- rank_loss_components %>%
               summarize(max_LRR_mass = max(LRR_mass[is.finite(LRR_mass)],na.rm=TRUE),
                         min_LRR_rich = min(LRR_rich[is.finite(LRR_rich)],na.rm=TRUE),
                         max_LRR_rac = max(LRR_RAC[is.finite(LRR_RAC)],na.rm=TRUE)),
-            by = 'id')
+            by = 'id') %>% 
+  mutate(yr.lg = log10(year_trt + 1))
+
 
 
 LRR_components <- rank_loss_components %>% 
   dplyr::select(-year_trt) %>% 
   left_join(.,dom_comm_LRR %>% 
-              dplyr::select(year_trt,site_code,plot,Taxon,richness_change,rank_change,losses,LRR_mass,LRR_RAC,LRR_rich),
+              dplyr::select(year_trt,yr.lg,site_code,plot,Taxon,richness_change,rank_change,losses,LRR_mass,LRR_RAC,LRR_rich),
             by = c('site_code','plot','Taxon')) %>% 
   filter(trt != 'Control')
 
-LRR_bio_components_mod <- lme(LRR_mass ~ trt * year_trt * inertia_last +
-                              trt * year_trt * resistance +
-                              trt * year_trt * initial_rel_cover - 1,
+LRR_bio_components_mod <- lme(LRR_mass ~ trt * yr.lg* inertia_last +
+                              trt * yr.lg * resistance +
+                              trt * yr.lg * initial_rel_cover - 1,
                         random = (~1|site_code/plot),
                         data = LRR_components,
                         na.action = na.omit)

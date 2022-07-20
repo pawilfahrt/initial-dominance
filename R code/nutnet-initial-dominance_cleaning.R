@@ -47,21 +47,21 @@ files<-list.files()
 # coverfile<-last(coverfile)
 # original_coverdat <- read_csv(coverfile)
 
-original_coverdat <- read.csv('/Users/wilf0020/Dropbox/Peter/Cover and biomass by date/full-cover-by-date-2022-01-25.csv')
+original_coverdat <- read.csv('/Users/wilf0020/Dropbox/Peter/Cover and biomass by date/full-cover-by-date-2022-07-20.csv')
 coverdat <- original_coverdat # backup
 
 dim(coverdat)
-# 291066   x  21 - sorted by date
+# 305412   x  21 - sorted by date
 
 comb_file<-files[grep("comb-by-plot-clim-soil-diversity", files)]
 comb_file<-last(comb_file)
 original_comb <- read_csv(comb_file)
 comb <- original_comb # backup
 
-cover_fix <- read_csv('https://github.com/jon-bakker/NutNet_TaxonomicAdjustments/raw/main/taxonomic-adjustments-2022-01-31.csv')
+cover_fix <- read_csv('https://github.com/jon-bakker/NutNet_TaxonomicAdjustments/raw/main/taxonomic-adjustments-2022-05-02.csv')
 
 # choose all experimental sites, with at least an N treatment, 1 year post-treatment:
-sites <-unique(comb$site_code[comb$trt== "NPK" # at least an N treatment
+sites <-unique(comb$site_code[comb$trt %in% c("NPK", "Fence") # at least an NPK treatment or fence
                                & (!comb$experiment_type %in% c("Observational")) # not observational site
                                &  comb$year_trt >=1 # has at least one year post-treatment data
                                ]) 
@@ -71,7 +71,7 @@ length(sites)
 sort(sites)
 
 
-# 92
+# 95
 # just the sites we want
 working_coverdat <- coverdat[coverdat$site_code %in% sites,]
 
@@ -102,8 +102,6 @@ working_coverdat <- droplevels(working_coverdat) %>%
 working_coverdat[working_coverdat$Taxon == 'RUMEX SP.',]$local_lifespan <- 'PERENNIAL'
 
 working_coverdat$functional_group <- ifelse(working_coverdat$functional_group %in% c('GRASS','GRAMINOID'), 'GRAMINOID',working_coverdat$functional_group)
-
-
 
 ### doane.us only sampled block 1 after pre-treatment year
 
@@ -245,7 +243,7 @@ working_coverdat <- cover_max %>%
   mutate(nplot = n_distinct(plot)) %>% 
   mutate(plotfreq_yr = nplot/nplots)
 
-#214240
+#224758
 
 ### calculate the frequency of a species in all pre-treatment plots
 cover_pre <- working_coverdat[working_coverdat$year_trt == 0 & working_coverdat$live == 1,] %>% 
@@ -269,12 +267,12 @@ hist(cover_pre$avgRankPerc)
 initial_dominants <- working_coverdat %>%
   filter(year_trt == 0) %>%
   group_by(site_code,plot)  %>%
-  slice_max(order_by = max_cover,with_ties = TRUE) %>%   #2807
+  slice_max(order_by = max_cover,with_ties = TRUE) %>%   #2947
   mutate(initial_rel_cover = cover, initial_abs_cover = max_cover) %>% 
-  dplyr::select(site_code,plot,Taxon,initial_rel_cover,initial_abs_cover)
+  dplyr::select(site_code,plot,Taxon,initial_rel_cover,initial_abs_cover) 
   # summarize(Taxon = Taxon[which.max(cover)], initial_abs_cover = max_cover[which.max(cover)], 
   #           initial_rel_cover = cover[which.max(cover)])
-  # 2589
+  # 2715 with_ties = FALSE
   # ~200 ties. Hmm
 
 initial_dominants %>% mutate(id = paste0(site_code,'.',plot)) %>% 
@@ -294,7 +292,7 @@ initial_dominants %>% mutate(id = paste0(site_code,'.',plot)) %>%
   slice_max(order_by = max_cover,with_ties = TRUE) %>% 
   group_by(id) %>% filter(n() > 1) %>% 
   dplyr::select(site_code,plot,Taxon,initial_rel_cover) %>% print(n=400) 
-### 16 repeats remain in year 2
+### 19 repeats remain in year 2
 ### Going to keep repeats for now. Will need to repair code down the line
 
 ### are any of these species in Jon Bakker's taxonomy fixing code?
@@ -338,8 +336,8 @@ dominant_year <- dominant_year %>%
   mutate(plotfreq_yr = ifelse(is.na(plotfreq_yr),0,plotfreq_yr))
 
 
-# 19,822 with single initial dominants (these were randomly chosen so not that valid)
-# 21,521 with multiple initial dominants and Bakker fixs
+# 19,822 (outdated) with single initial dominants (these were randomly chosen so not that valid)
+# 22,597 with multiple initial dominants and Bakker fixs
 
 scale_col <- function(x){
   (x - mean(x, na.rm=TRUE)) / sd(x, na.rm=TRUE)
@@ -368,8 +366,8 @@ dominant_pop <- initial_dominants %>%
   left_join(.,comb[!duplicated(comb$site_code),
                    c('site_code','site_richness',"MAP_VAR_v2","MAP_v2")],
             by = 'site_code') %>% 
-  left_join(.,comb[comb$year_trt == 0,c('site_code','plot','live_mass','litter_mass')], by = c('site_code','plot')) %>% 
-    rename(initial_live_mass = live_mass, initial_litter_mass = litter_mass) %>% 
+  left_join(.,comb[comb$year_trt == 0,c('site_code','plot','vascular_live_mass','litter_mass')], by = c('site_code','plot')) %>% 
+    rename(initial_live_mass = vascular_live_mass, initial_litter_mass = litter_mass) %>% 
   left_join(.,comb_soil[,c('site_code','soil_var')],by='site_code') %>% 
   filter(trt %in% c('Control','NPK','Fence','NPK+Fence')) %>% 
   mutate(NPK = if_else(trt %in% c('NPK','NPK+Fence'),1,0), Fence = if_else(trt %in% c('Fence','NPK+Fence'),1,0))
@@ -377,7 +375,7 @@ dominant_pop <- initial_dominants %>%
 
 #domMissByYear <- dominant_pop[dominant_pop$year1_change == 0,]
 
-dominant_pop[dominant_pop$local_lifespan == 'NULL',] # 201
+dominant_pop[dominant_pop$local_lifespan == 'NULL',] # 293
 
 #what's going on with Lolium multiflorum in frue.ch?
 working_coverdat %>% filter(site_code == 'frue.ch' & plot == 20) %>%
@@ -387,7 +385,7 @@ working_coverdat %>% filter(site_code == 'frue.ch' & plot == 20) %>%
 unique(dominant_pop$Taxon[dominant_pop$local_lifespan == 'NULL']) # 5
 
 
-dominant_pop[dominant_pop$Taxon %in% c('NARDUS STRICTA','LOLIUM MULTIFLORUM'),]$local_lifespan <- 'PERENNIAL'
+dominant_pop[dominant_pop$Taxon %in% c('NARDUS STRICTA','LOLIUM MULTIFLORUM',"ELYMUS SPICATUS"),]$local_lifespan <- 'PERENNIAL'
 dominant_pop[dominant_pop$Taxon %in% c('DAUCUS CAROTA'),]$local_lifespan <- 'BIENNIAL'
 
 
@@ -396,27 +394,34 @@ dominant_pop$local_lifespan <- ifelse(dominant_pop$local_lifespan %in% c('PERENN
 dominant_pop$functional_group <- ifelse(dominant_pop$functional_group %in% c('GRASS','GRAMINOID'), 'GRAMINOID',dominant_pop$functional_group)
 
 ### 7778 as of 2022-02-02
-### 8439 with multiple initial dominants as of 2022-02-21
+### 8908 with multiple initial dominants as of 2022-07-30
 
-# write.csv(dominant_pop,
-#           paste0('/Users/wilf0020/Library/Mobile Documents/com~apple~CloudDocs/Documents/NutNet manuscripts/Initial dominance/Data/Dominants-through-time_',
-#           Sys.Date(),'.csv'),
-#           row.names = F)
+write.csv(dominant_pop,
+          paste0('/Users/wilf0020/Library/Mobile Documents/com~apple~CloudDocs/Documents/NutNet manuscripts/Initial dominance/Project/initial-dominance/Data/Dominants-through-time_',
+          Sys.Date(),'.csv'),
+          row.names = F)
 
 #### Community changes ####
 ### calculate RAC curves of communities INDEPENDENT of the initial dominant
 
 working_coverdat$id <- paste(working_coverdat$site_code,working_coverdat$plot,sep='_')
 
+rich_subord <- working_coverdat %>%
+  filter(trt %in% c('Control','NPK','Fence','NPK+Fence')) %>%
+  left_join(.,dominant_pop %>% mutate(dom = 'YES') %>%
+              dplyr::select(site_code,plot,year_trt,Taxon,dom),
+            by = c('site_code','plot','year_trt','Taxon')) %>%
+  mutate(dom = if_else(is.na(dom),'NO',dom)) %>%
+  filter(!dom == 'YES') %>%
+  group_by(site_code,plot,year_trt) %>%
+  summarize(subord_rich = n())
+
 cover_subord <- working_coverdat %>% 
   filter(trt %in% c('Control','NPK','Fence','NPK+Fence')) %>% 
-  left_join(.,dominant_pop %>% mutate(dom = 'YES') %>% 
-              dplyr::select(site_code,plot,,year_trt,Taxon,dom),
-            by = c('site_code','plot','year_trt','Taxon')) %>% 
+  left_join(.,dominant_pop %>% mutate(dom = 'YES') %>% dplyr::select(site_code,plot,Taxon,dom),
+            by = c('site_code','plot','Taxon')) %>% 
   mutate(dom = if_else(is.na(dom),'NO',dom)) %>%
-  filter(!dom == 'YES') %>% 
-  group_by(site_code,plot,year_trt) %>% 
-  summarize(subord_rich = n())
+  filter(!dom == 'YES')
 
 rac_out <- RAC_change(df = cover_subord,
                       species.var = 'Taxon',
@@ -425,7 +430,7 @@ rac_out <- RAC_change(df = cover_subord,
                       time.var = 'year_trt',
                       reference.time = 0)
 
-cover_subord %>% filter(site_code == 'cdcr.us' & plot == 1) %>% dplyr::select(year_trt,subord_rich) %>% print(n=1000)
+rich_subord %>% filter(site_code == 'cdcr.us' & plot == 1) %>% dplyr::select(year_trt,subord_rich) %>% print(n=1000)
 working_coverdat %>% filter(site_code == 'cdcr.us' & plot == 1) %>% dplyr::select(year_trt,trt,Taxon,max_cover) %>% arrange(year_trt,max_cover) %>% print(n=1000)
 
 cor(rac_out[!is.na(rac_out$evenness_change),4:8])
@@ -442,9 +447,9 @@ dom_comm <- dominant_pop %>%
   mutate(ppt_var = as.numeric(MAP_VAR_v2)) %>% 
   dplyr::select(-year_trt) %>% rename(year_trt = year_trt2) %>% 
   left_join(.,comb %>% 
-              dplyr::select(site_code,plot,year_trt,live_mass,unsorted_mass,rich,evenness),
+              dplyr::select(site_code,plot,year_trt,vascular_live_mass,unsorted_live_mass,rich,evenness),
             by=c('site_code','plot','year_trt')) %>% 
-  left_join(.,cover_subord %>% dplyr::select(site_code,plot,year_trt,subord_rich),
+  left_join(.,rich_subord %>% dplyr::select(site_code,plot,year_trt,subord_rich),
             by=c('site_code','plot','year_trt'))
 
 dominant_pop %>% 
@@ -456,7 +461,7 @@ working_coverdat %>% filter(id == 'ethamc.au_1') %>% dplyr::select(year_trt,Taxo
 # so plots with only one species in pre-treatment are getting filtered out here. 29 total, going to go forward without them
 
 # write.csv(dom_comm,
-#           paste0('/Users/wilf0020/Library/Mobile Documents/com~apple~CloudDocs/Documents/NutNet manuscripts/Initial dominance/Data/RAC-subordinate_',Sys.Date(),'.csv'),
+#           paste0('/Users/wilf0020/Library/Mobile Documents/com~apple~CloudDocs/Documents/NutNet manuscripts/Initial dominance/Project/initial-dominance/Data/RAC-subordinate_',Sys.Date(),'.csv'),
 #           row.names = F)
 
 
