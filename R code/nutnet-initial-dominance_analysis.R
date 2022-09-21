@@ -181,12 +181,12 @@ pairs(dominant_pop[,c('initial_rel_cover','site_richness','MAP_v2','MAP_VAR_v2')
 
 #### Model of rank decay ####
 
-mod_rank <- lme(perc_rank ~ year_trt * initial_rel_cover * NPK * Fence +
+mod_rank <- lme((perc_rank - 1) ~ year_trt * initial_rel_cover * NPK * Fence +
                                    local_lifespan * year_trt * NPK * Fence  +
                                    plotfreq * year_trt * NPK * Fence +
                                    MAP_v2 * year_trt * NPK * Fence +
                                    MAP_VAR_v2 * year_trt * NPK * Fence +
-                                   site_richness * year_trt * NPK * Fence,
+                                   site_richness * year_trt * NPK * Fence - 1,
                                    random = ~ 1|site_code/plot,
                                  data = dominant_pop)
 
@@ -245,7 +245,7 @@ rank_life_emm <- rank_life_emm %>%
 
 rank_life_emm$sig <- ifelse(rank_life_emm$trt == 'NPK+Fence','No','Yes')
 
-gg_rank_year_life_trt <- ggplot(rank_life_emm, aes(x = year_trt, y = emmean, col = trt)) +
+gg_rank_year_life_trt <- ggplot(rank_life_emm, aes(x = year_trt, y = response, col = trt)) +
   geom_jitter(data = dominant_pop, aes(x=year_trt, y = perc_rank),  width=0.2, alpha = 0.8, col = 'grey90') +
   geom_ribbon(aes(ymin = lower.CL,ymax= upper.CL,fill=trt),alpha=0.15,color=NA) +
   #geom_line(aes(group = trt), size = 2, color= 'black') +
@@ -287,9 +287,9 @@ rank_init_emm$upper.CL <- ifelse(rank_init_emm$upper.CL > 1.05, 1.05, rank_init_
 rank_init_emm$lower.CL <- ifelse(rank_init_emm$lower.CL < 0, 0, rank_init_emm$lower.CL)
 
 
-gg_rank_year_init_trt <- ggplot(rank_init_emm, aes(x = year_trt, y = emmean, col = trt)) +
+gg_rank_year_init_trt <- ggplot(rank_init_emm, aes(x = year_trt, y = response +1, col = trt)) +
   #geom_jitter(data = dominant_pop, aes(x=year_trt, y = perc_rank),  width=0.1, alpha = 0.8, col = 'grey90') +
-  geom_ribbon(aes(ymin = lower.CL,ymax= upper.CL,fill=trt),alpha=0.25,color=NA) +
+  #geom_ribbon(aes(ymin = lower.CL+1,ymax= upper.CL+1,fill=trt),alpha=0.25,color=NA) +
   geom_line(aes(group = trt), size = 2, color= 'black') +
   geom_line(aes(group = trt), size = 1.8) +
   guides(color = guide_legend(title = "Treatment"), fill = guide_legend(title = "Treatment")) +
