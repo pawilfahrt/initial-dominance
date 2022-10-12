@@ -14,6 +14,7 @@ library(car)
 library(MuMIn)
 #library(RRPP)
 library(merTools)
+library(trajr)
 
 ## graphics
 library(ggplot2)
@@ -62,9 +63,9 @@ summary.tablefunc <- function(mod) {
 }
 
 
-dominant_pop <- read_csv('./Data/Dominants-through-time_2022-07-20.csv')
+dominant_pop <- read_csv('./Data/Dominants-through-time_2022-10-10.csv')
 
-dom_comm <- read_csv('./Data/RAC-subordinate_2022-07-20.csv')
+#dom_comm <- read_csv('./Data/RAC-subordinate_2022-07-20.csv')
 
 
 dominant_pop
@@ -181,12 +182,12 @@ pairs(dominant_pop[,c('initial_rel_cover','site_richness','MAP_v2','MAP_VAR_v2')
 
 #### Model of rank decay ####
 
-mod_rank <- lme((perc_rank - 1) ~ year_trt * initial_rel_cover * NPK * Fence +
+mod_rank <- lme(perc_rank ~ year_trt * initial_rel_cover * NPK * Fence +
                                    local_lifespan * year_trt * NPK * Fence  +
                                    plotfreq * year_trt * NPK * Fence +
                                    MAP_v2 * year_trt * NPK * Fence +
                                    MAP_VAR_v2 * year_trt * NPK * Fence +
-                                   site_richness * year_trt * NPK * Fence - 1,
+                                   site_richness * year_trt * NPK * Fence,
                                    random = ~ 1|site_code/plot,
                                  data = dominant_pop)
 
@@ -245,7 +246,7 @@ rank_life_emm <- rank_life_emm %>%
 
 rank_life_emm$sig <- ifelse(rank_life_emm$trt == 'NPK+Fence','No','Yes')
 
-gg_rank_year_life_trt <- ggplot(rank_life_emm, aes(x = year_trt, y = response, col = trt)) +
+gg_rank_year_life_trt <- ggplot(rank_life_emm, aes(x = year_trt, y = emmean, col = trt)) +
   geom_jitter(data = dominant_pop, aes(x=year_trt, y = perc_rank),  width=0.2, alpha = 0.8, col = 'grey90') +
   geom_ribbon(aes(ymin = lower.CL,ymax= upper.CL,fill=trt),alpha=0.15,color=NA) +
   #geom_line(aes(group = trt), size = 2, color= 'black') +
@@ -492,10 +493,104 @@ Fig2
 #           base_height = 8, base_width = 12)
 
 
+#### Figure 2 Alt - individual linear models ####
+
+## define year span for rank linear rank loss
+yr_cut <- 6
+
+dom_yr <- dominant_pop %>%
+  group_by(site_code) %>%
+  mutate(max_year = max(year_trt)) %>%
+  ungroup() %>%
+  filter(max_year >= yr_cut)
+
+length(unique(dom_yr$site_code))
+
+rank_loss_yr <- split(dom_yr, ~ site_code + plot) %>% 
+  discard(~nrow(.)==0) %>%
+  map(~lm(perc_rank-1 ~ year_trt-1, data = .,na.action=na.omit))  %>%  #one way to fix intercept at '1'
+  map_df(tidy,.id='plot') %>%
+  rename(est_rank = estimate)
+  
+
+rank_loss_yr
+
+#rank_loss_yr %>% filter(site_code == 'burrawan.au' & plot == 1)
+
+rank_loss_yr_graph <- rank_loss_yr %>% 
+  left_join(.,dominant_pop %>% dplyr::select(site_code, plot, Taxon, initial_rel_cover, perc_rank, year_trt, trt) %>% 
+              mutate(id = paste0(site_code,'.',plot)),
+            by = c('plot'='id')) %>% 
+  mutate(pred = 1 + (year_trt*est_rank))
+              
+rank_loss_yr_graph
+
+rank_loss_yr_stats <- rank_loss_yr %>% 
+  left_join(.,dominant_pop %>% 
+              dplyr::select(site_code, plot, Taxon, initial_rel_cover, MAP_v2,MAP_VAR_v2,site_richness,local_lifespan,plotfreq, trt, NPK, Fence) %>% 
+              mutate(id = paste0(site_code,'.',plot)) %>% 
+              distinct(id,.keep_all = TRUE),
+            by = c('plot'='id'))
+
+lme_yr_rank_slope <- lme(est_rank ~ NPK*Fence*initial_rel_cover +
+                           NPK*Fence*local_lifespan +
+                           plotfreq * NPK * Fence +
+                           MAP_v2 * NPK * Fence +
+                           MAP_VAR_v2 * NPK * Fence +
+                           site_richness * NPK * Fence,
+                         random = ~1|site_code/Taxon,
+                         data = rank_loss_yr_stats)
+
+summary(lme_yr_rank_slope)
+anova(lme_yr_rank_slope)
+
+## relative rank effect
+
+cov.low <- mean(dominant_pop$initial_rel_cover) - 1.5 * sd(dominant_pop$initial_rel_cover)
+cov.high <- mean(dominant_pop$initial_rel_cover) + 1.5 * sd(dominant_pop$initial_rel_cover)
+
+yr_init_emm <- data.frame(summary(emmeans(lme_yr_rank_slope, pairwise ~ NPK * Fence | initial_rel_cover,
+                                            at = list(initial_rel_cover = seq(from = 0.2, to = 1, by = 0.8)),
+                                            cov.reduce = TRUE,
+                                            type = "response")$emmeans))
+
+yr_init_emm <- yr_init_emm %>%
+  mutate(trt = if_else(NPK == 0 & Fence == 0, 'Control',
+                       if_else(NPK == 0 & Fence == 1, 'Fence',
+                               if_else(NPK == 1 & Fence == 0, 'NPK',
+                                       if_else(NPK == 1 & Fence == 1, 'NPK+Fence',NULL)))))
+
+yr_init_emm
+
+yr_init_emm$initial_cover <- factor(ifelse(yr_init_emm$initial_rel_cover == 0.2, 'Low Initial Cover','High Initial Cover'), levels = c('Low Initial Cover','High Initial Cover'))
+#yr_init_emm$upper.CL <- ifelse(yr_init_emm$upper.CL > 1.05, 1.05, yr_init_emm$upper.CL)
+#yr_init_emm$lower.CL <- ifelse(yr_init_emm$lower.CL < 0, 0, yr_init_emm$lower.CL)
+
+range(rank_loss_yr_graph$initial_rel_cover[rank_loss_yr_graph$year_trt == 0])
+mean(rank_loss_yr_graph$initial_rel_cover)
+rank_loss_yr_graph$initial_cover <- ifelse(rank_loss_yr_graph$initial_rel_cover < mean(rank_loss_yr_graph$initial_rel_cover),
+                                           'Low Initial Cover','High Initial Cover')
+
+
+gg_rank_year_init_trt_alt <- ggplot(rank_loss_yr_graph, aes(x = year_trt, y = perc_rank, col = trt)) +
+  geom_jitter(width=0.1, alpha = 0.8, col = 'grey90') +
+  #geom_ribbon(aes(ymin = lower.CL+1,ymax= upper.CL+1,fill=trt),alpha=0.25,color=NA) +
+  geom_abline(data = yr_init_emm, aes(intercept = 1, slope = emmean, col = trt), size = 2) +
+  #geom_line(aes(group = trt), size = 1.8) +
+  guides(color = guide_legend(title = "Treatment"), fill = guide_legend(title = "Treatment")) +
+  ylab('Rank percentage') + xlab('Year after treatment') +
+  #scale_color_brewer(palette = "Set1") +
+  scale_color_manual(values = ctrl_pal) +
+  scale_fill_manual(values = ctrl_pal) +
+  ylim(0,1.05) +
+  facet_wrap(~initial_cover)
+
+gg_rank_year_init_trt_alt
+
 ## defining inertia (logit model) ####
 
 ## define year span for inertia component
-yr_cut <- 10
+yr_cut <- 5
 
 dom_pop_yr <- dominant_pop %>%
   group_by(site_code) %>%
@@ -505,7 +600,8 @@ dom_pop_yr <- dominant_pop %>%
   filter(year_trt <= yr_cut)
 
 length(unique(dom_pop_yr$site_code))
-#25
+#25 for 10 year cutoff
+#57 for 5 year cutoff
 
 ### fit logit model to all species across time and extract first year where confidence interval doesn't include 1
 # 
@@ -629,6 +725,29 @@ gg_res_iner_corr
 
 # ggsave(paste0('Graphs/resistance-v-inertia_',Sys.Date(),'.png'),
 #        gg_res_iner_corr, width = 12, height = 8, units = "in", dpi = 600)
+
+
+#### defining oscillations ####
+
+osc <- split(dom_yr, ~ site_code + plot) %>% 
+  discard(~nrow(.)==0) %>%
+  discard(~mean(.$perc_rank) == 1) %>% 
+  map(~arima(.$perc_rank, c(1,0,0),method="ML"))  %>%  #one way to fix intercept at '1'
+  map_df(tidy,.id='plot') %>%
+  filter(term == 'ar1')
+
+range(osc$estimate)
+
+## high phi
+plot(dom_yr$perc_rank[dom_yr$site_code == 'cdcr.us' & dom_yr$plot == 1])
+
+#low phi
+osc[osc$estimate < -.6,]
+plot(dom_yr$perc_rank[dom_yr$site_code == 'sage.us' & dom_yr$plot == 24])
+
+# median phi
+osc[osc$estimate < .1 & osc$estimate > -.1,]
+plot(dom_yr$perc_rank[dom_yr$site_code == 'ukul.za' & dom_yr$plot == 2])
 
 
 #### univariate exploration of rank components ####

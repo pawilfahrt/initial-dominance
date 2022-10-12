@@ -47,7 +47,7 @@ files<-list.files()
 # coverfile<-last(coverfile)
 # original_coverdat <- read_csv(coverfile)
 
-original_coverdat <- read.csv('/Users/wilf0020/Dropbox/Peter/Cover and biomass by date/full-cover-by-date-2022-07-20.csv')
+original_coverdat <- read.csv('/Users/wilf0020/Dropbox/Peter/Cover and biomass by date/full-cover-by-date-2022-10-10.csv')
 coverdat <- original_coverdat # backup
 
 dim(coverdat)
@@ -400,68 +400,68 @@ write.csv(dominant_pop,
           paste0('/Users/wilf0020/Library/Mobile Documents/com~apple~CloudDocs/Documents/NutNet manuscripts/Initial dominance/Project/initial-dominance/Data/Dominants-through-time_',
           Sys.Date(),'.csv'),
           row.names = F)
-
-#### Community changes ####
-### calculate RAC curves of communities INDEPENDENT of the initial dominant
-
-working_coverdat$id <- paste(working_coverdat$site_code,working_coverdat$plot,sep='_')
-
-rich_subord <- working_coverdat %>%
-  filter(trt %in% c('Control','NPK','Fence','NPK+Fence')) %>%
-  left_join(.,dominant_pop %>% mutate(dom = 'YES') %>%
-              dplyr::select(site_code,plot,year_trt,Taxon,dom),
-            by = c('site_code','plot','year_trt','Taxon')) %>%
-  mutate(dom = if_else(is.na(dom),'NO',dom)) %>%
-  filter(!dom == 'YES') %>%
-  group_by(site_code,plot,year_trt) %>%
-  summarize(subord_rich = n())
-
-cover_subord <- working_coverdat %>% 
-  filter(trt %in% c('Control','NPK','Fence','NPK+Fence')) %>% 
-  left_join(.,dominant_pop %>% mutate(dom = 'YES') %>% dplyr::select(site_code,plot,Taxon,dom),
-            by = c('site_code','plot','Taxon')) %>% 
-  mutate(dom = if_else(is.na(dom),'NO',dom)) %>%
-  filter(!dom == 'YES')
-
-rac_out <- RAC_change(df = cover_subord,
-                      species.var = 'Taxon',
-                      abundance.var = 'max_cover',
-                      replicate.var = 'id',
-                      time.var = 'year_trt',
-                      reference.time = 0)
-
-rich_subord %>% filter(site_code == 'cdcr.us' & plot == 1) %>% dplyr::select(year_trt,subord_rich) %>% print(n=1000)
-working_coverdat %>% filter(site_code == 'cdcr.us' & plot == 1) %>% dplyr::select(year_trt,trt,Taxon,max_cover) %>% arrange(year_trt,max_cover) %>% print(n=1000)
-
-cor(rac_out[!is.na(rac_out$evenness_change),4:8])
-
-ggpairs(rac_out[!is.na(rac_out$evenness_change),4:8],upper = list(continuous = wrap("cor", size = 10)))
-
-dom_comm <- dominant_pop %>% 
-  filter(year_trt == 0) %>% 
-  dplyr::select(-year_trt) %>% 
-  mutate(id = paste(site_code,plot, sep = '_')) %>% 
-  left_join(rac_out, by='id') %>% 
-  filter(trt %in% c('Control','NPK','Fence','NPK+Fence')) %>% 
-  mutate(NPK = if_else(trt %in% c('NPK','NPK+Fence'),1,0), Fence = if_else(trt %in% c('Fence','NPK+Fence'),1,0)) %>% 
-  mutate(ppt_var = as.numeric(MAP_VAR_v2)) %>% 
-  dplyr::select(-year_trt) %>% rename(year_trt = year_trt2) %>% 
-  left_join(.,comb %>% 
-              dplyr::select(site_code,plot,year_trt,vascular_live_mass,unsorted_live_mass,rich,evenness),
-            by=c('site_code','plot','year_trt')) %>% 
-  left_join(.,rich_subord %>% dplyr::select(site_code,plot,year_trt,subord_rich),
-            by=c('site_code','plot','year_trt'))
-
-dominant_pop %>% 
-  filter(year_trt == 0) %>% 
-  mutate(id = paste(site_code,plot, sep = '_')) %>% 
-  filter(!id %in% rac_out$id)
-
-working_coverdat %>% filter(id == 'ethamc.au_1') %>% dplyr::select(year_trt,Taxon) %>% print(n=100)
-# so plots with only one species in pre-treatment are getting filtered out here. 29 total, going to go forward without them
-
-# write.csv(dom_comm,
-#           paste0('/Users/wilf0020/Library/Mobile Documents/com~apple~CloudDocs/Documents/NutNet manuscripts/Initial dominance/Project/initial-dominance/Data/RAC-subordinate_',Sys.Date(),'.csv'),
-#           row.names = F)
+# 
+# #### Community changes ####
+# ### calculate RAC curves of communities INDEPENDENT of the initial dominant
+# 
+# working_coverdat$id <- paste(working_coverdat$site_code,working_coverdat$plot,sep='_')
+# 
+# rich_subord <- working_coverdat %>%
+#   filter(trt %in% c('Control','NPK','Fence','NPK+Fence')) %>%
+#   left_join(.,dominant_pop %>% mutate(dom = 'YES') %>%
+#               dplyr::select(site_code,plot,year_trt,Taxon,dom),
+#             by = c('site_code','plot','year_trt','Taxon')) %>%
+#   mutate(dom = if_else(is.na(dom),'NO',dom)) %>%
+#   filter(!dom == 'YES') %>%
+#   group_by(site_code,plot,year_trt) %>%
+#   summarize(subord_rich = n())
+# 
+# cover_subord <- working_coverdat %>% 
+#   filter(trt %in% c('Control','NPK','Fence','NPK+Fence')) %>% 
+#   left_join(.,dominant_pop %>% mutate(dom = 'YES') %>% dplyr::select(site_code,plot,Taxon,dom),
+#             by = c('site_code','plot','Taxon')) %>% 
+#   mutate(dom = if_else(is.na(dom),'NO',dom)) %>%
+#   filter(!dom == 'YES')
+# 
+# rac_out <- RAC_change(df = cover_subord,
+#                       species.var = 'Taxon',
+#                       abundance.var = 'max_cover',
+#                       replicate.var = 'id',
+#                       time.var = 'year_trt',
+#                       reference.time = 0)
+# 
+# rich_subord %>% filter(site_code == 'cdcr.us' & plot == 1) %>% dplyr::select(year_trt,subord_rich) %>% print(n=1000)
+# working_coverdat %>% filter(site_code == 'cdcr.us' & plot == 1) %>% dplyr::select(year_trt,trt,Taxon,max_cover) %>% arrange(year_trt,max_cover) %>% print(n=1000)
+# 
+# cor(rac_out[!is.na(rac_out$evenness_change),4:8])
+# 
+# ggpairs(rac_out[!is.na(rac_out$evenness_change),4:8],upper = list(continuous = wrap("cor", size = 10)))
+# 
+# dom_comm <- dominant_pop %>% 
+#   filter(year_trt == 0) %>% 
+#   dplyr::select(-year_trt) %>% 
+#   mutate(id = paste(site_code,plot, sep = '_')) %>% 
+#   left_join(rac_out, by='id') %>% 
+#   filter(trt %in% c('Control','NPK','Fence','NPK+Fence')) %>% 
+#   mutate(NPK = if_else(trt %in% c('NPK','NPK+Fence'),1,0), Fence = if_else(trt %in% c('Fence','NPK+Fence'),1,0)) %>% 
+#   mutate(ppt_var = as.numeric(MAP_VAR_v2)) %>% 
+#   dplyr::select(-year_trt) %>% rename(year_trt = year_trt2) %>% 
+#   left_join(.,comb %>% 
+#               dplyr::select(site_code,plot,year_trt,vascular_live_mass,unsorted_live_mass,rich,evenness),
+#             by=c('site_code','plot','year_trt')) %>% 
+#   left_join(.,rich_subord %>% dplyr::select(site_code,plot,year_trt,subord_rich),
+#             by=c('site_code','plot','year_trt'))
+# 
+# dominant_pop %>% 
+#   filter(year_trt == 0) %>% 
+#   mutate(id = paste(site_code,plot, sep = '_')) %>% 
+#   filter(!id %in% rac_out$id)
+# 
+# working_coverdat %>% filter(id == 'ethamc.au_1') %>% dplyr::select(year_trt,Taxon) %>% print(n=100)
+# # so plots with only one species in pre-treatment are getting filtered out here. 29 total, going to go forward without them
+# 
+# # write.csv(dom_comm,
+# #           paste0('/Users/wilf0020/Library/Mobile Documents/com~apple~CloudDocs/Documents/NutNet manuscripts/Initial dominance/Project/initial-dominance/Data/RAC-subordinate_',Sys.Date(),'.csv'),
+# #           row.names = F)
 
 
