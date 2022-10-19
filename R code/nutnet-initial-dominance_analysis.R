@@ -314,10 +314,18 @@ rank_init_emm$up_btrans <- sin(rank_init_emm$upper.CL)^2
 rank_init_emm$em_btrans <- invlogit(rank_init_emm$emmean)
 rank_init_emm$low_btrans <- invlogit(rank_init_emm$lower.CL)
 rank_init_emm$up_btrans <- invlogit(rank_init_emm$upper.CL)
+<<<<<<< HEAD
 
+=======
+>>>>>>> 389ce1a6604d07df9ac02ca42521fe03d39ba657
 
 #rank_init_emm %>% filter(year_trt %in% c(14,15) & initial_rel_cover == 0.2)
 
+<<<<<<< HEAD
+=======
+#rank_init_emm %>% filter(year_trt %in% c(14,15) & initial_rel_cover == 0.2)
+
+>>>>>>> 389ce1a6604d07df9ac02ca42521fe03d39ba657
 gg_rank_year_init_trt <- ggplot(rank_init_emm, aes(x = year_trt, y = em_btrans, col = trt)) +
   #geom_jitter(data = dominant_pop, aes(x=year_trt, y = perc_rank),  width=0.1, alpha = 0.8, col = 'grey90') +
   geom_ribbon(aes(ymin = low_btrans,ymax= up_btrans,fill=trt),alpha=0.25,color=NA) +
@@ -356,6 +364,7 @@ rank_rich_emm$sig <- ifelse(rank_rich_emm$trt %in% c('Fence','NPK+Fence'),'No','
 rank_rich_emm$richness <- factor(ifelse(rank_rich_emm$site_richness == 25, 'Low site richness','High site richness'), levels = c('Low site richness','High site richness'))
 # rank_rich_emm$upper.CL <- ifelse(rank_rich_emm$upper.CL > 1.05, 1.05, rank_rich_emm$upper.CL)
 # rank_rich_emm$lower.CL <- ifelse(rank_rich_emm$lower.CL < 0, 0, rank_rich_emm$lower.CL)
+<<<<<<< HEAD
 
 # rank_rich_emm$em_btrans <- sin(rank_rich_emm$emmean)^2
 # rank_rich_emm$low_btrans <- sin(rank_rich_emm$lower.CL)^2
@@ -366,6 +375,18 @@ rank_rich_emm <-  mutate(rank_rich_emm,
                           low_btrans = invlogit(lower.CL),
                           up_btrans = invlogit(upper.CL))
 
+=======
+
+# rank_rich_emm$em_btrans <- sin(rank_rich_emm$emmean)^2
+# rank_rich_emm$low_btrans <- sin(rank_rich_emm$lower.CL)^2
+# rank_rich_emm$up_btrans <- sin(rank_rich_emm$upper.CL)^2
+
+rank_rich_emm <-  mutate(rank_rich_emm,
+                          em_btrans = invlogit(emmean), 
+                          low_btrans = invlogit(lower.CL),
+                          up_btrans = invlogit(upper.CL))
+
+>>>>>>> 389ce1a6604d07df9ac02ca42521fe03d39ba657
 
 
 gg_rank_year_rich_trt <- ggplot(rank_rich_emm, aes(x = year_trt, y = em_btrans, col = trt)) +
@@ -407,11 +428,19 @@ rank_map_emm$sig <- ifelse(rank_map_emm$trt %in% c('NPK','NPK+Fence'),'No','Yes'
 rank_map_emm$ppt <- factor(ifelse(rank_map_emm$MAP_v2 == 500, 'Low MAP','High MAP'), levels = c('Low MAP','High MAP'))
 # rank_map_emm$upper.CL <- ifelse(rank_map_emm$upper.CL > 1.05, 1.05, rank_map_emm$upper.CL)
 #rank_map_emm$lower.CL <- ifelse(rank_map_emm$lower.CL < 0, 0, rank_map_emm$lower.CL)
+<<<<<<< HEAD
+=======
+
+rank_map_emm$em_btrans <- sin(rank_map_emm$emmean)^2
+rank_map_emm$low_btrans <- sin(rank_map_emm$lower.CL)^2
+rank_map_emm$up_btrans <- sin(rank_map_emm$upper.CL)^2
+>>>>>>> 389ce1a6604d07df9ac02ca42521fe03d39ba657
 
 # rank_map_emm$em_btrans <- sin(rank_map_emm$emmean)^2
 # rank_map_emm$low_btrans <- sin(rank_map_emm$lower.CL)^2
 # rank_map_emm$up_btrans <- sin(rank_map_emm$upper.CL)^2
 
+<<<<<<< HEAD
 rank_map_emm <-  mutate(rank_map_emm,
                          em_btrans = invlogit(emmean), 
                          low_btrans = invlogit(lower.CL),
@@ -419,6 +448,8 @@ rank_map_emm <-  mutate(rank_map_emm,
 
 
 
+=======
+>>>>>>> 389ce1a6604d07df9ac02ca42521fe03d39ba657
 gg_rank_year_ppt_trt <- ggplot(rank_map_emm, aes(x = year_trt, y = em_btrans, col = trt)) +
   #geom_jitter(data = dominant_pop, aes(x=year_trt, y = perc_rank),  width=0.1, alpha = 0.8, col = 'grey90') +
   geom_ribbon(aes(ymin = low_btrans,ymax= up_btrans,fill=trt),alpha=0.25,color=NA) +
@@ -455,17 +486,27 @@ rank_pptvar_emm$sig <- ifelse(rank_pptvar_emm$trt %in% c('NPK','NPK+Fence'),'No'
 rank_pptvar_emm$pptvar <- factor(ifelse(rank_pptvar_emm$MAP_VAR_v2 == 20, 'Low PPT Variation','High PPT Variation'), levels = c('Low PPT Variation','High PPT Variation'))
 # rank_pptvar_emm$upper.CL <- ifelse(rank_pptvar_emm$upper.CL > 1.05, 1.05, rank_pptvar_emm$upper.CL)
 # rank_pptvar_emm$lower.CL <- ifelse(rank_pptvar_emm$lower.CL < 0, 0, rank_pptvar_emm$lower.CL)
+<<<<<<< HEAD
+=======
+
+rank_pptvar_emm$em_btrans <- sin(rank_pptvar_emm$emmean)^2
+rank_pptvar_emm$low_btrans <- sin(rank_pptvar_emm$lower.CL)^2
+rank_pptvar_emm$up_btrans <- sin(rank_pptvar_emm$upper.CL)^2
+>>>>>>> 389ce1a6604d07df9ac02ca42521fe03d39ba657
 
 # rank_pptvar_emm$em_btrans <- sin(rank_pptvar_emm$emmean)^2
 # rank_pptvar_emm$low_btrans <- sin(rank_pptvar_emm$lower.CL)^2
 # rank_pptvar_emm$up_btrans <- sin(rank_pptvar_emm$upper.CL)^2
 
+<<<<<<< HEAD
 rank_pptvar_emm <-  mutate(rank_pptvar_emm,
                         em_btrans = invlogit(emmean), 
                         low_btrans = invlogit(lower.CL),
                         up_btrans = invlogit(upper.CL))
 
 
+=======
+>>>>>>> 389ce1a6604d07df9ac02ca42521fe03d39ba657
 gg_rank_year_pptvar_trt <- ggplot(rank_pptvar_emm, aes(x = year_trt, y = em_btrans, col = trt)) +
   #geom_jitter(data = dominant_pop, aes(x=year_trt, y = perc_rank),  width=0.1, alpha = 0.8, col = 'grey90') +
   geom_ribbon(aes(ymin = low_btrans,ymax= up_btrans,fill=trt),alpha=0.35,color=NA) +
