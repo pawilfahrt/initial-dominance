@@ -243,7 +243,7 @@ working_coverdat <- cover_max %>%
   mutate(nplot = n_distinct(plot)) %>% 
   mutate(plotfreq_yr = nplot/nplots)
 
-#224758
+#229472
 
 ### calculate the frequency of a species in all pre-treatment plots
 cover_pre <- working_coverdat[working_coverdat$year_trt == 0 & working_coverdat$live == 1,] %>% 
@@ -273,7 +273,7 @@ initial_dominants <- working_coverdat %>%
   # summarize(Taxon = Taxon[which.max(cover)], initial_abs_cover = max_cover[which.max(cover)], 
   #           initial_rel_cover = cover[which.max(cover)])
   # 2715 with_ties = FALSE
-  # ~200 ties. Hmm
+  # ~200 ties.
 
 initial_dominants %>% mutate(id = paste0(site_code,'.',plot)) %>% 
   group_by(id) %>% filter(n() > 1) %>% 
@@ -294,21 +294,6 @@ initial_dominants %>% mutate(id = paste0(site_code,'.',plot)) %>%
   dplyr::select(site_code,plot,Taxon,initial_rel_cover) %>% print(n=400) 
 ### 19 repeats remain in year 2
 ### Going to keep repeats for now. Will need to repair code down the line
-
-### are any of these species in Jon Bakker's taxonomy fixing code?
-cover_fix %>% inner_join(.,initial_dominants,by=c('site_code','Taxon')) %>% 
-                           distinct(Taxon,.keep_all = TRUE)
-# now fixed earlier so zero
-#8 species (35 plots due to repeats)
-# much more manageable than expected!
-
-
-
-# initial_dominants <- left_join(initial_dominants,cover_fix %>% dplyr::select(site_code,Taxon,NewTaxon),
-#                                by = c('site_code','Taxon')) %>% 
-#   mutate(NewTaxon = ifelse(is.na(NewTaxon), Taxon, NewTaxon)) %>%
-#   select(-Taxon) %>% 
-#   rename(Taxon = NewTaxon)
 
 
 ## merge to multi-year data and expand grid to include zero for years where spp is missing
@@ -336,8 +321,7 @@ dominant_year <- dominant_year %>%
   mutate(plotfreq_yr = ifelse(is.na(plotfreq_yr),0,plotfreq_yr))
 
 
-# 19,822 (outdated) with single initial dominants (these were randomly chosen so not that valid)
-# 22,597 with multiple initial dominants and Bakker fixs
+# 23171 with multiple initial dominants and Bakker fixs
 
 scale_col <- function(x){
   (x - mean(x, na.rm=TRUE)) / sd(x, na.rm=TRUE)
@@ -364,7 +348,7 @@ dominant_pop <- initial_dominants %>%
   left_join(.,cover_pre[, c('site_code','plot','trt','Taxon',"local_provenance", "local_lifespan", "functional_group",'plotfreq','avgCover')],
             by=c('site_code'='site_code','plot'='plot','Taxon'='Taxon')) %>% 
   left_join(.,comb[!duplicated(comb$site_code),
-                   c('site_code','site_richness',"MAP_VAR_v2","MAP_v2")],
+                   c('site_code','site_richness',"MAP_VAR_v2","MAP_v2","MAT_v2","TEMP_VAR_v2")],
             by = 'site_code') %>% 
   left_join(.,comb[comb$year_trt == 0,c('site_code','plot','vascular_live_mass','litter_mass')], by = c('site_code','plot')) %>% 
     rename(initial_live_mass = vascular_live_mass, initial_litter_mass = litter_mass) %>% 
@@ -375,12 +359,7 @@ dominant_pop <- initial_dominants %>%
 
 #domMissByYear <- dominant_pop[dominant_pop$year1_change == 0,]
 
-dominant_pop[dominant_pop$local_lifespan == 'NULL',] # 293
-
-#what's going on with Lolium multiflorum in frue.ch?
-working_coverdat %>% filter(site_code == 'frue.ch' & plot == 20) %>%
-  dplyr::select(year, Taxon, max_cover) %>% arrange(Taxon) %>%    print(n=50)
-### looks like it really might disappear in year 1
+dominant_pop[dominant_pop$local_lifespan == 'NULL',] # 305
 
 unique(dominant_pop$Taxon[dominant_pop$local_lifespan == 'NULL']) # 5
 
@@ -393,8 +372,93 @@ dominant_pop[dominant_pop$Taxon %in% c('DAUCUS CAROTA'),]$local_lifespan <- 'BIE
 dominant_pop$local_lifespan <- ifelse(dominant_pop$local_lifespan %in% c('PERENNIAL','INDETERMINATE','NULL'), 'PERENNIAL','ANNUAL')
 dominant_pop$functional_group <- ifelse(dominant_pop$functional_group %in% c('GRASS','GRAMINOID'), 'GRAMINOID',dominant_pop$functional_group)
 
+#provenance
+
+unique(dominant_pop$local_provenance)
+dominant_pop[dominant_pop$local_provenance == 'NULL',] # 526
+unique(dominant_pop$Taxon[dominant_pop$local_provenance == 'NULL']) # 9
+
+dominant_pop %>% filter(Taxon == 'UNKNOWN ')
+working_coverdat %>% filter(site_code == 'kibber.in' & plot == 2) %>% dplyr::select(year_trt,Taxon, functional_group,rel_cover,cover) %>% 
+  print(n = 100)
+
+#going to delete this unknown as it's tied with another species for initial dominance and there's no certainty if it actually disappears in year 1 on
+dominant_pop <- filter(dominant_pop, !(Taxon == 'UNKNOWN '))
+
+dominant_pop %>% filter(Taxon == 'CAREX SP.') %>% distinct(site_code)
+# no evidence of non-native carex in Oregon, especially common ones
+dominant_pop[dominant_pop$Taxon == 'CAREX SP.' & dominant_pop$site_code == 'bnch.us',]$local_provenance <- 'NAT'
+
+# no idea on provenance of Carex in India
+dominant_pop[dominant_pop$Taxon == 'CAREX SP.' & dominant_pop$site_code == 'kibber.in',]$local_provenance <- 'UNK'
+
+# daucus carota
+dominant_pop %>% filter(Taxon == 'DAUCUS CAROTA') %>% distinct(site_code)
+
+dominant_pop[dominant_pop$Taxon == 'DAUCUS CAROTA' & dominant_pop$site_code == 'mcdan.us',]$local_provenance <- 'INT'
+
+# elymus spicata
+
+dominant_pop %>% filter(Taxon == "ELYMUS SPICATUS") %>% distinct(site_code) %>% print(n=100)
+dominant_pop[dominant_pop$Taxon == "ELYMUS SPICATUS",]$local_provenance <- 'NAT'
+
+# "HETEROTHECA VILLOSA"
+dominant_pop %>% filter(Taxon == "HETEROTHECA VILLOSA") %>% distinct(site_code) %>% print(n=100)
+dominant_pop[dominant_pop$Taxon == "HETEROTHECA VILLOSA",]$local_provenance <- 'NAT'
+
+# "MELICA NUTANS"  
+
+dominant_pop %>% filter(Taxon == "MELICA NUTANS") %>% distinct(site_code) %>% print(n=100)
+dominant_pop[dominant_pop$Taxon == "MELICA NUTANS",]$local_provenance <- 'NAT'
+
+
+# "SETARIA SP."   
+
+dominant_pop %>% filter(Taxon == "SETARIA SP.") %>% distinct(site_code) %>% print(n=100)
+# likely setaria parviflora based on my time at this site (native)
+dominant_pop[dominant_pop$Taxon == "SETARIA SP.",]$local_provenance <- 'NAT'
+
+
+
+#    "NARDUS STRICTA" 
+
+dominant_pop %>% filter(Taxon == "NARDUS STRICTA") %>% distinct(site_code) %>% print(n=100)
+dominant_pop[dominant_pop$Taxon == "NARDUS STRICTA",]$local_provenance <- 'NAT'
+
+
+# "AGROSTIS SP."
+
+dominant_pop %>% filter(Taxon == "AGROSTIS SP.") %>% distinct(site_code) %>% print(n=100)
+#common agrostis is native to Europe, so seems reasonable assumption
+dominant_pop[dominant_pop$Taxon == "AGROSTIS SP.",]$local_provenance <- 'NAT'
+
+dominant_pop[dominant_pop$local_provenance == 'NULL',] # 0
+unique(dominant_pop$Taxon[dominant_pop$local_provenance == 'UNK']) # 9
+
+# "AMBROSIA ARTEMISIIFOLIA"
+
+dominant_pop %>% filter(Taxon == "AMBROSIA ARTEMISIIFOLIA") %>% distinct(site_code) %>% print(n=100)
+# definitely native in MN
+dominant_pop[dominant_pop$Taxon == "AMBROSIA ARTEMISIIFOLIA",]$local_provenance <- 'NAT'
+
+
+# "HIERACIUM SP."           
+
+dominant_pop %>% filter(Taxon == "HIERACIUM SP.") %>% distinct(site_code) %>% print(n=100)
+sort(unique(working_coverdat$Taxon[working_coverdat$site_code == 'kbs.us']))
+# not solvable
+
+
+# "DANTHONIA SPICATA"    
+dominant_pop %>% filter(Taxon == "DANTHONIA SPICATA") %>% distinct(site_code) %>% print(n=100)
+dominant_pop[dominant_pop$Taxon == "DANTHONIA SPICATA",]$local_provenance <- 'NAT'
+
+dominant_pop[dominant_pop$local_provenance == 'UNK',] # 23
+
 ### 7778 as of 2022-02-02
 ### 8908 with multiple initial dominants as of 2022-07-30
+### 9126 with multiple initial dominants as of 2022-10-19
+
 
 write.csv(dominant_pop,
           paste0('/Users/wilf0020/Library/Mobile Documents/com~apple~CloudDocs/Documents/NutNet manuscripts/Initial dominance/Project/initial-dominance/Data/Dominants-through-time_',
