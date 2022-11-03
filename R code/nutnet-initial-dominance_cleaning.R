@@ -41,13 +41,13 @@ anova.tablefunc <- function(mod) {
 }
 
 ## Read in data
-setwd("~/Dropbox/NutNet data")
+setwd("/Users/wilf0020/Library/CloudStorage/Dropbox/NutNet data")
 files<-list.files()
 # coverfile<-files[grep("full-cover-", files)]
 # coverfile<-last(coverfile)
 # original_coverdat <- read_csv(coverfile)
 
-original_coverdat <- read.csv('/Users/wilf0020/Dropbox/Peter/Cover and biomass by date/full-cover-by-date-2022-10-10.csv')
+original_coverdat <- read.csv('/Users/wilf0020/Library/CloudStorage/Dropbox/Peter/Cover and biomass by date/full-cover-by-date-2022-10-10.csv')
 coverdat <- original_coverdat # backup
 
 dim(coverdat)
@@ -85,6 +85,8 @@ working_coverdat$year_trt <- ifelse(working_coverdat$site_code == 'lagoas.br' & 
 site.miss <- sites[!sites %in%  unique(working_coverdat$site_code[working_coverdat$year_trt == 0])]
 
 sites <- sort(unique(working_coverdat$site_code[working_coverdat$year_trt == 0]))
+
+#89 sites
 
 working_coverdat <- coverdat[coverdat$site_code %in% sites,]
 
@@ -455,6 +457,18 @@ dominant_pop[dominant_pop$Taxon == "DANTHONIA SPICATA",]$local_provenance <- 'NA
 
 dominant_pop[dominant_pop$local_provenance == 'UNK',] # 23
 
+unique(dominant_pop$functional_group)
+dominant_pop[dominant_pop$functional_group == 'NULL',]
+unique(dominant_pop$Taxon[dominant_pop$functional_group == 'NULL']) # 1
+
+dominant_pop[dominant_pop$Taxon == "CAREX SP.",]$functional_group <- 'GRAMINOID'
+
+unique(dominant_pop$Taxon[dominant_pop$functional_group == 'WOODY']) # 23
+unique(dominant_pop$Taxon[dominant_pop$functional_group == 'LEGUME']) # 12
+unique(dominant_pop$Taxon[dominant_pop$functional_group == 'GRAMINOID']) #127
+unique(dominant_pop$Taxon[dominant_pop$functional_group == 'FORB']) #89
+
+
 ### 7778 as of 2022-02-02
 ### 8908 with multiple initial dominants as of 2022-07-30
 ### 9126 with multiple initial dominants as of 2022-10-19
@@ -464,7 +478,7 @@ write.csv(dominant_pop,
           paste0('/Users/wilf0020/Library/Mobile Documents/com~apple~CloudDocs/Documents/NutNet manuscripts/Initial dominance/Project/initial-dominance/Data/Dominants-through-time_',
           Sys.Date(),'.csv'),
           row.names = F)
-# 
+
 # #### Community changes ####
 # ### calculate RAC curves of communities INDEPENDENT of the initial dominant
 # 
