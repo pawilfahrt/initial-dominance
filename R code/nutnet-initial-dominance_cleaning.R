@@ -17,6 +17,10 @@ library(ggplot2)
 library(cowplot)
 library(GGally)
 
+# remove MASS if loaded from analysis script (interferes with dplyr select)
+# detach(package:merTools)
+# detach(package:arm)
+# detach(package:MASS)
 
 theme_figs <- theme_classic() +
   theme(axis.title = element_text(size = 18), axis.text = element_text(size = 18),
@@ -472,6 +476,17 @@ unique(dominant_pop$Taxon[dominant_pop$functional_group == 'FORB']) #89
 ### 7778 as of 2022-02-02
 ### 8908 with multiple initial dominants as of 2022-07-30
 ### 9126 with multiple initial dominants as of 2022-10-19
+
+
+### add year 0 site richness
+
+dominant_pop <- left_join(dominant_pop, 
+                              working_coverdat %>% 
+                                filter(year_trt == 0, live == 1, !Taxon %in% c('LICHEN','BRYOPHYTE')) %>% 
+                                group_by(site_code) %>% 
+                                distinct(Taxon) %>% 
+                                summarize(site_rich_0 = n()),
+                              by = 'site_code')
 
 
 write.csv(dominant_pop,
