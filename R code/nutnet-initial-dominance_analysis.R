@@ -197,12 +197,19 @@ mod_rank <- lme(rank_logit ~ year_trt * initial_rel_cover * NPK * Fence +
                                    func_simple * year_trt * NPK * Fence +
                                    MAP_v2 * year_trt * NPK * Fence +
                                    MAP_VAR_v2 * year_trt * NPK * Fence +
-                                   site_richness * year_trt * NPK * Fence
-                                   ,
+                                   site_richness * year_trt * NPK * Fence,
                                    random = ~ 1|site_code/plot,
                                  data = dom_complete)
 
-
+# mod_rank_lmer <- lmer(rank_logit ~ year_trt * initial_rel_cover * NPK * Fence +
+#                   local_lifespan * year_trt * NPK * Fence  +
+#                   local_provenance * year_trt * NPK * Fence  +
+#                   func_simple * year_trt * NPK * Fence +
+#                   MAP_v2 * year_trt * NPK * Fence +
+#                   MAP_VAR_v2 * year_trt * NPK * Fence +
+#                   site_richness * year_trt * NPK * Fence + 
+#                     (1|site_code/plot),
+#                 data = dom_complete)
 
 # mod_rank_yr <- lme(perc_rank ~  initial_rel_cover * year_trt * NPK * Fence +
 #                   local_lifespan * year_trt * NPK * Fence  +
@@ -236,11 +243,24 @@ r.squaredGLMM(mod_rank)
 # [1,] 0.2403656 0.5550991
 
 # write_csv(rank_table,
-#           paste0('./Tables/rank-decay-table_',
+#           paste0('./Tables/rank-decay-logit-table_',
 #                  Sys.Date(),'.csv'))
 
 
 #### graphing rank decay ####
+
+## define function for determining graphical display of continuous gradients
+
+# upper <- function(x) max(x)
+# lower <- function(x) min(x)
+upper <- function(x) quantile(x, 0.95)
+lower <- function(x) quantile(x, 0.05)
+# upper <- function(x) mean(x) + (sd(x)*1.5)
+# lower <- function(x) mean(x) - (sd(x)*1.5)
+
+
+upper(dominant_pop$initial_rel_cover)
+
 
 #create discrete categories for graphing purporses
 dominant_pop <- dominant_pop %>% 
@@ -395,8 +415,8 @@ rank_table %>% filter(Effect %in% grep('initial',rank_table$Effect, value = TRUE
 # cov.low <- mean(dominant_pop$initial_rel_cover) - 2 * sd(dominant_pop$initial_rel_cover)
 # cov.high <- mean(dominant_pop$initial_rel_cover) + 2 * sd(dominant_pop$initial_rel_cover)
 
-cov.low <- min(dominant_pop$initial_rel_cover)
-cov.high <- max(dominant_pop$initial_rel_cover)
+cov.low <- lower(dominant_pop$initial_rel_cover)
+cov.high <- upper(dominant_pop$initial_rel_cover)
 
 
 rank_init_emm <- data.frame(summary(emmeans(mod_rank, pairwise ~ NPK * Fence | initial_rel_cover * year_trt,
@@ -450,11 +470,8 @@ rank_table %>% filter(Effect %in% grep('richness',rank_table$Effect, value = TRU
 
 ### only npk sig
 
-# rich.low <- mean(dominant_pop$site_richness) - 2 * sd(dominant_pop$site_richness)
-# rich.high <- mean(dominant_pop$site_richness) + 2 * sd(dominant_pop$site_richness)
-
-rich.low <- min(dominant_pop$site_richness)
-rich.high <- max(dominant_pop$site_richness)
+rich.low <- lower(dominant_pop$site_richness)
+rich.high <- upper(dominant_pop$site_richness)
 
 
 rank_rich_emm <- data.frame(summary(emmeans(mod_rank, pairwise ~ NPK * Fence | site_richness * year_trt,
@@ -512,10 +529,8 @@ rank_table %>% filter(Effect %in% grep('MAP_v2',rank_table$Effect, value = TRUE)
 
 #fence sig
 
-# map.low <- mean(dominant_pop$MAP_v2) - 2 * sd(dominant_pop$MAP_v2)  # hmmm, this is negative. Maybe just take mins and maxes
-# map.high <- mean(dominant_pop$MAP_v2) + 2 * sd(dominant_pop$MAP_v2)
-map.low <- min(dominant_pop$MAP_v2)
-map.high <- max(dominant_pop$MAP_v2)
+map.low <- lower(dominant_pop$MAP_v2)
+map.high <- upper(dominant_pop$MAP_v2)
 
 
 rank_map_emm <- data.frame(summary(emmeans(mod_rank, pairwise ~ NPK * Fence | MAP_v2 * year_trt,
@@ -569,8 +584,8 @@ gg_rank_year_ppt_trt
 rank_table %>% filter(Effect %in% grep('MAP_VAR_v2',rank_table$Effect, value = TRUE))
 # fence is sig, NPK+fence marginal
 
-mvar.low <- min(dominant_pop$MAP_VAR_v2)
-mvar.high <- max(dominant_pop$MAP_VAR_v2)
+mvar.low <- lower(dominant_pop$MAP_VAR_v2)
+mvar.high <- upper(dominant_pop$MAP_VAR_v2)
 
 
 rank_pptvar_emm <- data.frame(summary(emmeans(mod_rank, pairwise ~ NPK * Fence | MAP_VAR_v2 * year_trt,
@@ -745,6 +760,202 @@ Fig2.rank <- grid.arrange(gg_rank_init,blankPlot,
 #           Fig2,
 #           base_height = 8, base_width = 12)
 
+
+# Defining inertia #####
+
+### first can we create an 'effect size' table of when model upper CI drop below 0.95 as a proxy for inertia?
+### on closer examination - looking at the extreme values of each continuous variable means wider confidence intervals, 
+
+emm_options(rg.limit = 200000)
+
+cf = mean(dom_complete$perc_rank[dom_complete$year_trt != 0])
+
+inertia_npk <-  data.frame(summary(emmeans(mod_rank, pairwise ~ NPK * Fence |  year_trt,
+                                                          at = list(year_trt = seq(from = 0, to = 15, by = 0.1)),
+                                                          cov.reduce = TRUE,
+                                                          type = "response")$emmeans))  %>% 
+  mutate(trt = if_else(NPK == 0 & Fence == 0, 'Control',
+                       if_else(NPK == 0 & Fence == 1, 'Fence',
+                               if_else(NPK == 1 & Fence == 0, 'NPK',
+                                       if_else(NPK == 1 & Fence == 1, 'NPK+Fence',NULL))))) %>% 
+  mutate(cutoff = cf, mean_btrans = invlogit(emmean), upper_btrans = invlogit(upper.CL),Predictor = 'Average') %>% 
+  group_by(NPK,Fence) %>% 
+  arrange(year_trt) %>% 
+  # slice(if(any(upper_btrans < cutoff)) which.max(upper_btrans < cutoff) else which.max(year_trt == max(year_trt))) %>% 
+  slice(if(any(mean_btrans < cutoff)) which.max(mean_btrans < cutoff) else which.max(year_trt == max(year_trt))) %>% 
+  pivot_wider(names_from = trt, values_from = year_trt, id_cols = Predictor) 
+
+inertia_npk
+
+inertia_init <- data.frame(summary(emmeans(mod_rank, pairwise ~ NPK * Fence | initial_rel_cover * year_trt,
+#                                           at = list(initial_rel_cover = seq(from = cov.low, to = cov.high, by = (cov.high-cov.low)/2),
+                                            at = list(initial_rel_cover = seq(from = cov.low, to = cov.high, by = (cov.high-cov.low)),
+                                                                         year_trt = seq(from = 0, to = 15, by = 0.1)),
+                                                               cov.reduce = TRUE,
+                                                               type = "response")$emmeans))  %>% 
+  mutate(trt = if_else(NPK == 0 & Fence == 0, 'Control',
+                       if_else(NPK == 0 & Fence == 1, 'Fence',
+                               if_else(NPK == 1 & Fence == 0, 'NPK',
+                                       if_else(NPK == 1 & Fence == 1, 'NPK+Fence',NULL))))) %>% 
+  mutate(cutoff = cf, mean_btrans = invlogit(emmean), upper_btrans = invlogit(upper.CL)) %>% 
+  group_by(NPK,Fence, initial_rel_cover) %>% 
+  arrange(year_trt) %>% 
+  # slice(if(any(upper_btrans < cutoff)) which.max(upper_btrans < cutoff) else which.max(year_trt == max(year_trt))) %>% 
+  slice(if(any(mean_btrans < cutoff)) which.max(mean_btrans < cutoff) else which.max(year_trt == max(year_trt))) %>% 
+  mutate(initial_cover = factor(if_else(initial_rel_cover == cov.low, 'Low Initial Cover',
+                                        if_else(initial_rel_cover == cov.high,'High Initial Cover', 'Average Initial Cover')))) %>% 
+  pivot_wider(names_from = trt, values_from = year_trt, id_cols = initial_cover) %>% 
+  rename(Predictor = 1) 
+
+inertia_init
+
+inertia_map <- data.frame(summary(emmeans(mod_rank, pairwise ~ NPK * Fence | MAP_v2 * year_trt,
+                                           # at = list(MAP_v2 = seq(from = map.low, to = map.high, by = (map.high-map.low)/2),
+                                                     at = list(MAP_v2 = seq(from = map.low, to = map.high, by = (map.high-map.low)),
+                                                     year_trt = seq(from = 0, to = 15, by = 0.1)),
+                                           cov.reduce = TRUE,
+                                           type = "response")$emmeans))  %>% 
+  mutate(trt = if_else(NPK == 0 & Fence == 0, 'Control',
+                       if_else(NPK == 0 & Fence == 1, 'Fence',
+                               if_else(NPK == 1 & Fence == 0, 'NPK',
+                                       if_else(NPK == 1 & Fence == 1, 'NPK+Fence',NULL))))) %>% 
+  mutate(cutoff = cf, mean_btrans = invlogit(emmean), upper_btrans = invlogit(upper.CL)) %>% 
+  group_by(NPK,Fence, MAP_v2) %>% 
+  arrange(year_trt) %>% 
+  # slice(if(any(upper_btrans < cutoff)) which.max(upper_btrans < cutoff) else which.max(year_trt == max(year_trt))) %>% 
+  slice(if(any(mean_btrans < cutoff)) which.max(mean_btrans < cutoff) else which.max(year_trt == max(year_trt))) %>% 
+  mutate(MAP = factor(if_else(MAP_v2 == map.low, 'Low MAP',
+                                        if_else(MAP_v2 == map.high,'High MAP', 'Average MAP')))) %>% 
+  pivot_wider(names_from = trt, values_from = year_trt, id_cols = MAP) %>% 
+  rename(Predictor = 1)
+
+inertia_map
+
+inertia_mapvar <- data.frame(summary(emmeans(mod_rank, pairwise ~ NPK * Fence | MAP_VAR_v2 * year_trt,
+                                          # at = list(MAP_VAR_v2 = seq(from = mvar.low, to = mvar.high, by = (mvar.high-mvar.low)/2),
+                                                    at = list(MAP_VAR_v2 = seq(from = mvar.low, to = mvar.high, by = (mvar.high-mvar.low)),
+                                                    year_trt = seq(from = 0, to = 15, by = 0.1)),
+                                          cov.reduce = TRUE,
+                                          type = "response")$emmeans))  %>% 
+  mutate(trt = if_else(NPK == 0 & Fence == 0, 'Control',
+                       if_else(NPK == 0 & Fence == 1, 'Fence',
+                               if_else(NPK == 1 & Fence == 0, 'NPK',
+                                       if_else(NPK == 1 & Fence == 1, 'NPK+Fence',NULL))))) %>% 
+  mutate(cutoff = cf, mean_btrans = invlogit(emmean), upper_btrans = invlogit(upper.CL)) %>% 
+  group_by(NPK,Fence, MAP_VAR_v2) %>% 
+  arrange(year_trt) %>% 
+  # slice(if(any(upper_btrans < cutoff)) which.max(upper_btrans < cutoff) else which.max(year_trt == max(year_trt))) %>% 
+  slice(if(any(mean_btrans < cutoff)) which.max(mean_btrans < cutoff) else which.max(year_trt == max(year_trt))) %>% 
+  mutate(ppt_variation = factor(if_else(MAP_VAR_v2 == mvar.low, 'Low PPT Variation',
+                              if_else(MAP_VAR_v2 == mvar.high,'High PPT Variation', 'Average PPT Variation')))) %>% 
+  pivot_wider(names_from = trt, values_from = year_trt, id_cols = ppt_variation)%>% 
+  rename(Predictor = 1)
+
+inertia_mapvar
+
+inertia_rich <- data.frame(summary(emmeans(mod_rank, pairwise ~ NPK * Fence | site_richness * year_trt,
+                                             # at = list(site_richness = seq(from = rich.low, to = rich.high, by = (rich.high-rich.low)/2),
+                                                       at = list(site_richness = seq(from = rich.low, to = rich.high, by = (rich.high-rich.low)),
+                                                       year_trt = seq(from = 0, to = 15, by = 0.1)),
+                                             cov.reduce = TRUE,
+                                             type = "response")$emmeans))  %>% 
+  mutate(trt = if_else(NPK == 0 & Fence == 0, 'Control',
+                       if_else(NPK == 0 & Fence == 1, 'Fence',
+                               if_else(NPK == 1 & Fence == 0, 'NPK',
+                                       if_else(NPK == 1 & Fence == 1, 'NPK+Fence',NULL))))) %>% 
+  mutate(cutoff = cf, mean_btrans = invlogit(emmean), upper_btrans = invlogit(upper.CL)) %>% 
+  group_by(NPK,Fence, site_richness) %>% 
+  arrange(year_trt) %>% 
+  # slice(if(any(upper_btrans < cutoff)) which.max(upper_btrans < cutoff) else which.max(year_trt == max(year_trt))) %>% 
+  slice(if(any(mean_btrans < cutoff)) which.max(mean_btrans < cutoff) else which.max(year_trt == max(year_trt))) %>% 
+  mutate(Site_Richness = factor(if_else(site_richness == rich.low, 'Low Site Richness',
+                                        if_else(site_richness == rich.high,'High Site Richness', 'Average Site Richness')))) %>% 
+  pivot_wider(names_from = trt, values_from = year_trt, id_cols = Site_Richness)%>% 
+  rename(Predictor = 1)
+
+inertia_rich
+
+inertia_life <- data.frame(summary(emmeans(mod_rank, pairwise ~ NPK * Fence | local_lifespan * year_trt,
+                                           at = list(year_trt = seq(from = 0, to = 15, by = 0.1)),
+                                           cov.reduce = TRUE,
+                                           type = "response")$emmeans))  %>% 
+  mutate(trt = if_else(NPK == 0 & Fence == 0, 'Control',
+                       if_else(NPK == 0 & Fence == 1, 'Fence',
+                               if_else(NPK == 1 & Fence == 0, 'NPK',
+                                       if_else(NPK == 1 & Fence == 1, 'NPK+Fence',NULL))))) %>% 
+  mutate(cutoff = cf, mean_btrans = invlogit(emmean), upper_btrans = invlogit(upper.CL)) %>% 
+  group_by(NPK,Fence, local_lifespan) %>% 
+  arrange(year_trt) %>% 
+  # slice(if(any(upper_btrans < cutoff)) which.max(upper_btrans < cutoff) else which.max(year_trt == max(year_trt))) %>% 
+  slice(if(any(mean_btrans < cutoff)) which.max(mean_btrans < cutoff) else which.max(year_trt == max(year_trt))) %>% 
+  pivot_wider(names_from = trt, values_from = year_trt, id_cols = local_lifespan)%>% 
+  rename(Predictor = 1)
+
+inertia_life  
+
+inertia_func <- data.frame(summary(emmeans(mod_rank, pairwise ~ NPK * Fence | func_simple * year_trt,
+                                           at = list(year_trt = seq(from = 0, to = 15, by = 0.1)),
+                                           cov.reduce = TRUE,
+                                           type = "response")$emmeans))  %>% 
+  mutate(trt = if_else(NPK == 0 & Fence == 0, 'Control',
+                       if_else(NPK == 0 & Fence == 1, 'Fence',
+                               if_else(NPK == 1 & Fence == 0, 'NPK',
+                                       if_else(NPK == 1 & Fence == 1, 'NPK+Fence',NULL))))) %>% 
+  mutate(cutoff = cf, mean_btrans = invlogit(emmean), upper_btrans = invlogit(upper.CL)) %>% 
+  group_by(NPK,Fence, func_simple) %>% 
+  arrange(year_trt) %>% 
+  # slice(if(any(upper_btrans < cutoff)) which.max(upper_btrans < cutoff) else which.max(year_trt == max(year_trt))) %>% 
+  slice(if(any(mean_btrans < cutoff)) which.max(mean_btrans < cutoff) else which.max(year_trt == max(year_trt))) %>% 
+  pivot_wider(names_from = trt, values_from = year_trt, id_cols = func_simple)%>% 
+  rename(Predictor = 1)
+
+inertia_func
+  
+inertia_prov <- data.frame(summary(emmeans(mod_rank, pairwise ~ NPK * Fence | local_provenance * year_trt,
+                                           at = list(year_trt = seq(from = 0, to = 15, by = 0.1)),
+                                           cov.reduce = TRUE,
+                                           type = "response")$emmeans))  %>% 
+  mutate(trt = if_else(NPK == 0 & Fence == 0, 'Control',
+                       if_else(NPK == 0 & Fence == 1, 'Fence',
+                               if_else(NPK == 1 & Fence == 0, 'NPK',
+                                       if_else(NPK == 1 & Fence == 1, 'NPK+Fence',NULL))))) %>% 
+  mutate(cutoff = cf, mean_btrans = invlogit(emmean), upper_btrans = invlogit(upper.CL)) %>% 
+  group_by(NPK,Fence, local_provenance) %>% 
+  arrange(year_trt) %>% 
+  # slice(if(any(upper_btrans < cutoff)) which.max(upper_btrans < cutoff) else which.max(year_trt == max(year_trt))) %>% 
+  slice(if(any(mean_btrans < cutoff)) which.max(mean_btrans < cutoff) else which.max(year_trt == max(year_trt))) %>% 
+  pivot_wider(names_from = trt, values_from = year_trt, id_cols = local_provenance) %>% 
+  rename(Predictor = 1)
+
+inertia_prov
+
+inertia_tab <- bind_rows(inertia_npk, inertia_init,inertia_life,inertia_func,inertia_prov,inertia_map,inertia_mapvar,inertia_rich)
+
+inertia_tab <-inertia_tab %>% mutate(fence_per = -100*(1-Fence/Control),
+                       npk_per = -100*(1-NPK/Control),
+                       npkf_per = -100*(1-`NPK+Fence`/Control)) %>% 
+  mutate(Fence = paste0(Fence, ' (',signif(fence_per,3),'%)'),
+         NPK = paste0(NPK, ' (',signif(npk_per,3),'%)'),
+         `NPK+Fence` = paste0(`NPK+Fence`, ' (',signif(npkf_per,3),'%)')) %>% 
+  dplyr::select(-c(fence_per,npk_per,npkf_per))
+  
+inertia_tab
+
+#write_csv(inertia_tab,'./Tables/Inertia-effect-size.csv')
+
+####
+
+dom_pop_yr_pred  <- dom_complete %>%
+  bind_cols(.,predictInterval(mod_rank_lmer,dom_complete,
+                              level = 0.90, n.sims = 1000,
+                              stat = "median", type="linear.prediction",
+                              include.resid.var = TRUE))
+
+
+# only works for lmer models
+
+dom_complete$pred_logit <- predict(mod_rank,dom_complete)
+dom_complete$pred_invlogit <- invlogit(dom_complete$pred_logit)
 
 #### Figure 2 Alt - individual linear models ####
 
