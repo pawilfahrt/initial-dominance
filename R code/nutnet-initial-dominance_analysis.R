@@ -74,8 +74,6 @@ dominant_pop$local_lifespan <- gsub('ANNUAL','Annual',dominant_pop$local_lifespa
 dominant_pop$local_lifespan <- gsub('PERENNIAL','Perennial',dominant_pop$local_lifespan)
 
 
-
-
 display.brewer.pal(11, "Blues")
 brewer.pal(11, "Blues")
 
@@ -130,6 +128,18 @@ pairs(dominant_pop[,c('initial_rel_cover','site_richness','MAP_v2','MAP_VAR_v2')
 
 dominant_pop$site_richness <- dominant_pop$site_rich_0
 
+### find percentage of species that never dip below 1 (all sites, hen 10+ yr_trt sites)
+
+rank_avg <- dominant_pop %>% 
+  group_by(site_code) %>% 
+  mutate(max_year = max(year_trt)) %>% ungroup() %>% 
+  group_by(site_code, plot, Taxon, max_year) %>% 
+  summarize(avg_rank = mean(perc_rank))
+
+nrow(rank_avg %>% filter(avg_rank == 1)) / nrow(rank_avg) ## 22.1%
+nrow(rank_avg %>% filter(avg_rank == 1, max_year >= 10)) / nrow(rank_avg %>%filter(max_year >= 10)) ## 9.1%
+
+
 # asinTransform <- function(p) { asin(sqrt(p)) }
 
 logit
@@ -140,6 +150,9 @@ dominant_pop$rank_adj <- ifelse(dominant_pop$perc_rank == 1, 0.99,
 dominant_pop$rank_logit <- logit(dominant_pop$rank_adj)
 
 #### reduce functional groups to two roughly equal (taxon-wise) groups for simplicity
+dom0 <- dominant_pop %>% filter(year_trt == 0)
+tapply(dom0$functional_group,dom0$functional_group,length)
+
 dominant_pop$func_simple <- ifelse(dominant_pop$functional_group == 'GRAMINOID','GRAMINOID','NON-GRAMINOID')
 
 dom_complete <- dominant_pop %>% filter(local_provenance != 'UNK')
@@ -183,6 +196,47 @@ r.squaredGLMM(mod_rank)
 # write_csv(rank_table,
 #           paste0('./Tables/rank-decay-logit-table_',
 #                  Sys.Date(),'.csv'))
+
+#* relative importance via AIC ####
+
+AIC(mod_rank) #42439.56
+mod.cov <- update(mod_rank, . ~ . - initial_rel_cover - NPK:initial_rel_cover - year_trt:initial_rel_cover
+              - Fence:initial_rel_cover -year_trt:NPK:initial_rel_cover - year_trt:Fence:initial_rel_cover
+              - year_trt:NPK:Fence:initial_rel_cover) # 42491.69
+
+mod.life <- (update(mod_rank, . ~ . - local_lifespan - NPK:local_lifespan - year_trt:local_lifespan
+           - Fence:local_lifespan -year_trt:NPK:local_lifespan - year_trt:Fence:local_lifespan
+           - year_trt:NPK:Fence:local_lifespan)) # 42466.72
+
+mod.func <- (update(mod_rank, . ~ . - func_simple - NPK:func_simple - year_trt:func_simple
+           - Fence:func_simple -year_trt:NPK:func_simple - year_trt:Fence:func_simple
+           - year_trt:NPK:Fence:func_simple)) # 42433.07
+
+mod.prov <- (update(mod_rank, . ~ . - local_provenance - NPK:local_provenance - year_trt:local_provenance
+           - Fence:local_provenance -year_trt:NPK:local_provenance - year_trt:Fence:local_provenance
+           - year_trt:NPK:Fence:local_provenance)) # 42465.61
+
+mod.rich <- (update(mod_rank, . ~ . - site_richness - NPK:site_richness - year_trt:site_richness
+           - Fence:site_richness -year_trt:NPK:site_richness - year_trt:Fence:site_richness
+           - year_trt:NPK:Fence:site_richness)) # 42385.85
+
+mod.map <- (update(mod_rank, . ~ . - MAP_v2 - NPK:MAP_v2 - year_trt:MAP_v2
+           - Fence:MAP_v2 -year_trt:NPK:MAP_v2 - year_trt:Fence:MAP_v2
+           - year_trt:NPK:Fence:MAP_v2)) # 42331.08
+
+mod.var <- (update(mod_rank, . ~ . - MAP_VAR_v2 - NPK:MAP_VAR_v2 - year_trt:MAP_VAR_v2
+           - Fence:MAP_VAR_v2 -year_trt:NPK:MAP_VAR_v2 - year_trt:Fence:MAP_VAR_v2
+           - year_trt:NPK:Fence:MAP_VAR_v2)) # 42419.36
+
+aic.tab <- data.frame(Predictor = c('Full Model','Initial Cover','Lifespan','Provenance','Functional Group','Site Richness','MAP','Preciptation variability'),
+                         AIC = c(AIC(mod_rank),AIC(mod.cov),AIC(mod.life),AIC(mod.prov),AIC(mod.func),AIC(mod.rich),AIC(mod.map),AIC(mod.var))) %>% 
+  mutate(deltaAIC = round(AIC - AIC[1],1))
+                         
+aic.tab
+                         
+# to add pseudo-r2
+                         # R2 = c(r.squaredGLMM(mod_rank)[1],r.squaredGLMM(mod.cov)[1],r.squaredGLMM(mod.life)[1],r.squaredGLMM(mod.prov)[1],r.squaredGLMM(mod.func)[1],
+                         #        r.squaredGLMM(mod.rich)[1],r.squaredGLMM(mod.map)[1],r.squaredGLMM(mod.var)[1]))
 
 
 #### graphing rank decay ####
@@ -609,8 +663,8 @@ gg_rank_prov <- gg_rank_year_prov_trt + theme(legend.position="none", axis.title
 Fig3 <- ggdraw() +
   draw_plot(rank_legend, x = -0.3, y = 0.95, width = 1, height = .05) +
   draw_plot(gg_rank_life, x = 0.03, y = 0.65, width = .97, height = .3) +
-  draw_plot(gg_rank_func, x = 0.03, y = 0.35, width = .97, height = .3) +
-  draw_plot(gg_rank_prov, x = 0.03, y = 0.05, width = .97, height = .3) +
+  draw_plot(gg_rank_prov, x = 0.03, y = 0.35, width = .97, height = .3) +
+  draw_plot(gg_rank_func, x = 0.03, y = 0.05, width = .97, height = .3) +
   draw_plot_label(label = c("A", "B", "C"), size = 20,
                     x = c(0.03, 0.03, 0.03), y = c(0.95, 0.65, 0.35)) +
   draw_text('Rank Percentile',angle = 90, x = 0.015, size = 25) +
@@ -684,7 +738,7 @@ inertia_npk
 inertia_init <- data.frame(summary(emmeans(mod_rank, pairwise ~ NPK * Fence | initial_rel_cover * year_trt,
 #                                           at = list(initial_rel_cover = seq(from = cov.low, to = cov.high, by = (cov.high-cov.low)/2),
                                             at = list(initial_rel_cover = seq(from = cov.low, to = cov.high, by = (cov.high-cov.low)),
-                                                                         year_trt = seq(from = 0, to = 15, by = 0.1)),
+                                                                         year_trt = seq(from = 0, to = 40, by = 0.1)),
                                                                cov.reduce = TRUE,
                                                                type = "response")$emmeans))  %>% 
   mutate(trt = if_else(NPK == 0 & Fence == 0, 'Control',
@@ -835,7 +889,4 @@ inertia_tab <-inertia_tab %>% mutate(fence_per = -100*(1-Fence/Control),
   
 inertia_tab
 
-#write_csv(inertia_tab,paste0('./Tables/Inertia-effect-size',Sys.Date(),'.csv'))
-
-
-
+#write_csv(inertia_tab,paste0('./Tables/Inertia-effect-size_',Sys.Date(),'.csv'))
