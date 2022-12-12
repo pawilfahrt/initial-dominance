@@ -107,7 +107,7 @@ dominant_pop$rank_logit <- logit(dominant_pop$rank_adj)
 dom0 <- dominant_pop %>% filter(year_trt == 0)
 tapply(dom0$functional_group,dom0$functional_group,length)
 
-dominant_pop$func_simple <- ifelse(dominant_pop$functional_group == 'GRAMINOID','GRAMINOID','NON-GRAMINOID')
+dominant_pop$func_simple <- ifelse(dominant_pop$functional_group == 'GRAMINOID','Graminoid','Non-graminoid')
 
 dom_complete <- dominant_pop %>% filter(local_provenance != 'UNK')
 
@@ -120,6 +120,10 @@ mod_rank <- lme(rank_logit ~ year_trt * initial_rel_cover * NPK * Fence +
                                    site_richness * year_trt * NPK * Fence,
                                    random = ~ 1|site_code/plot,
                                  data = dom_complete)
+
+
+# check normality of residuals
+qqnorm(residuals(mod_rank)) #looks fine
 
 
  # create summary table
@@ -348,9 +352,6 @@ rank_func_emm$em_btrans <- invlogit(rank_func_emm$emmean)
 rank_func_emm$low_btrans <- invlogit(rank_func_emm$lower.CL)
 rank_func_emm$up_btrans <- invlogit(rank_func_emm$upper.CL)
 
-# rename factors for nicer labels
-rank_func_emm$func_simple <- ifelse(rank_func_emm$local_provenance == 'GRAMINOID','Graminoid','Non-graminoid')
-dom_complete$func_simple <- ifelse(dom_complete$local_provenance == 'GRAMINOID','Graminoid','Non-graminoid')
 
 gg_rank_year_func_trt <- ggplot(rank_func_emm, aes(x = year_trt, y = em_btrans, col = trt)) +
   geom_jitter(data = dom_complete, aes(x=year_trt, y = perc_rank),  width=0.2, alpha = 0.8, col = 'grey90') +
@@ -370,6 +371,7 @@ gg_rank_year_func_trt
 #* initial cover effect ----
 
 rank_table %>% filter(Effect %in% grep('initial',rank_table$Effect, value = TRUE))
+
 ### all sig
 
 # cov.low <- mean(dominant_pop$initial_rel_cover) - 2 * sd(dominant_pop$initial_rel_cover)
@@ -631,7 +633,7 @@ Fig3 <- ggdraw() +
 
 Fig3
 
-# Fig 4 - species chars
+# Fig S1 - environmental characteristics
 
 gg_rank_rich <- gg_rank_year_rich_trt + theme(legend.position="none", axis.title.y=element_blank(),axis.title.x=element_blank())
 gg_rank_ppt <- gg_rank_year_ppt_trt + theme(legend.position="none", axis.title.y=element_blank(),axis.title.x=element_blank())
@@ -656,11 +658,11 @@ Fig2
 # save_plot(paste0('Graphs/Fig2-rank-initial-cover_',Sys.Date(),'.png'),
 #           Fig2,
 #           base_height = 8, base_width = 10)
-# 
+# # 
 # save_plot(paste0('Graphs/Fig3-rank-traits_',Sys.Date(),'.png'),
 #           Fig3,
 #           base_height = 14, base_width = 10)
-# 
+# # 
 # save_plot(paste0('Graphs/Fig4-rank-env_',Sys.Date(),'.png'),
 #           Fig4,
 #           base_height = 14, base_width = 10)
@@ -670,11 +672,10 @@ Fig2
 
 # Defining inertia #####
 
-### first can we create an 'effect size' table of when model upper CI drop below 0.95 as a proxy for inertia?
-### on closer examination - looking at the extreme values of each continuous variable means wider confidence intervals, 
+### This creates an 'effect size' table of when model estimates drops below mean rank value for different covariate levels
+### output is estimated year (in tenths) at which given conditions are expected to drop below the mean
 
-emm_options(rg.limit = 200000)
-
+#define mean rank percentile
 cf = mean(dom_complete$perc_rank[dom_complete$year_trt != 0])
 
 inertia_npk <-  data.frame(summary(emmeans(mod_rank, pairwise ~ NPK * Fence |  year_trt,
@@ -716,6 +717,9 @@ inertia_init <- data.frame(summary(emmeans(mod_rank, pairwise ~ NPK * Fence | in
 
 inertia_init
 
+map.low <- lower(dom_complete$MAP_v2)
+map.high <- upper(dom_complete$MAP_v2)
+
 inertia_map <- data.frame(summary(emmeans(mod_rank, pairwise ~ NPK * Fence | MAP_v2 * year_trt,
                                            # at = list(MAP_v2 = seq(from = map.low, to = map.high, by = (map.high-map.low)/2),
                                                      at = list(MAP_v2 = seq(from = map.low, to = map.high, by = (map.high-map.low)),
@@ -738,6 +742,9 @@ inertia_map <- data.frame(summary(emmeans(mod_rank, pairwise ~ NPK * Fence | MAP
 
 inertia_map
 
+mvar.low <- lower(dom_complete$MAP_VAR_v2)
+mvar.high <- upper(dom_complete$MAP_VAR_v2)
+
 inertia_mapvar <- data.frame(summary(emmeans(mod_rank, pairwise ~ NPK * Fence | MAP_VAR_v2 * year_trt,
                                           # at = list(MAP_VAR_v2 = seq(from = mvar.low, to = mvar.high, by = (mvar.high-mvar.low)/2),
                                                     at = list(MAP_VAR_v2 = seq(from = mvar.low, to = mvar.high, by = (mvar.high-mvar.low)),
@@ -759,6 +766,9 @@ inertia_mapvar <- data.frame(summary(emmeans(mod_rank, pairwise ~ NPK * Fence | 
   rename(Predictor = 1)
 
 inertia_mapvar
+
+rich.low <- lower(dom_complete$site_richness)
+rich.high <- upper(dom_complete$site_richness)
 
 inertia_rich <- data.frame(summary(emmeans(mod_rank, pairwise ~ NPK * Fence | site_richness * year_trt,
                                              # at = list(site_richness = seq(from = rich.low, to = rich.high, by = (rich.high-rich.low)/2),
@@ -836,8 +846,10 @@ inertia_prov <- data.frame(summary(emmeans(mod_rank, pairwise ~ NPK * Fence | lo
 
 inertia_prov
 
+#put the tables together
 inertia_tab <- bind_rows(inertia_npk, inertia_init,inertia_life,inertia_func,inertia_prov,inertia_map,inertia_mapvar,inertia_rich)
 
+#calculate percentage change
 inertia_tab <-inertia_tab %>% mutate(fence_per = -100*(1-Fence/Control),
                        npk_per = -100*(1-NPK/Control),
                        npkf_per = -100*(1-`NPK+Fence`/Control)) %>% 
