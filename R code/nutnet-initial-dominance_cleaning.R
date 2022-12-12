@@ -508,6 +508,6 @@ site_tab <- comb %>% filter(site_code %in% dominant_pop$site_code) %>%
   left_join(.,dominant_pop %>% group_by(site_code) %>% distinct(site_code,.keep_all = TRUE) %>% dplyr::select(site_code,site_rich_0),
             by='site_code')
 
-write_csv(site_tab,
-         '/Users/wilf0020/Library/Mobile Documents/com~apple~CloudDocs/Documents/NutNet manuscripts/Initial dominance/Project/initial-dominance/Data/site_table.csv'
-)
+# write_csv(site_tab,
+#          '/Users/wilf0020/Library/Mobile Documents/com~apple~CloudDocs/Documents/NutNet manuscripts/Initial dominance/Project/initial-dominance/Data/site_table.csv'
+# )
