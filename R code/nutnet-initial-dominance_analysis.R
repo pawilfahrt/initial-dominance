@@ -24,6 +24,9 @@ library(RColorBrewer)
 library(gridExtra)
 library(grid)
 
+
+
+# create graphics parameters/aesthetics
 theme_figs <- theme_classic() +
   theme(axis.title = element_text(size = 24), axis.text = element_text(size = 24),
         plot.title = element_text(face = "bold", hjust = 0.5),
@@ -35,6 +38,7 @@ theme_figs <- theme_classic() +
         axis.line = element_line(colour = 'grey60', size = 0.35), axis.ticks = element_line(colour = 'grey60', size = 0.35)) 
 theme_set(theme_figs)
 
+# functions to tidy up model output tables
 anova.tablefunc <- function(mod) {  
   dat <- data.frame(anova(mod)) %>%
     tibble::rownames_to_column(var = 'Effect') %>%
@@ -63,64 +67,14 @@ summary.tablefunc <- function(mod) {
 }
 
 
+#read in data
 dominant_pop <- read_csv('./Data/Dominants-through-time_2022-11-17.csv')
+dominant_pop # take a look
 
-#dom_comm <- read_csv('./Data/RAC-subordinate_2022-07-20.csv')
-
-
-dominant_pop
-
+# create nice labels
 dominant_pop$local_lifespan <- gsub('ANNUAL','Annual',dominant_pop$local_lifespan)
 dominant_pop$local_lifespan <- gsub('PERENNIAL','Perennial',dominant_pop$local_lifespan)
 
-
-display.brewer.pal(11, "Blues")
-brewer.pal(11, "Blues")
-
-pos <- position_dodge(0.5)
-
-ctrl_pal <- c('black',"#D53E4F","#6BAED6","#5E4FA2")
-# 
-
-
-year_hist <- dominant_pop %>%
-  group_by(site_code) %>%
-  mutate(max_year = max(year_trt)) %>% 
-  ungroup %>% 
-  distinct(site_code, .keep_all = TRUE)
-
-tapply(year_hist$max_year,year_hist$max_year,length)
-
-scale_col <- function(x){
-  (x - mean(x, na.rm=TRUE)) / sd(x, na.rm=TRUE)
-}
-
-# scale everything for graphing purposes
-
-dominant_pop$ppt_var_scale <- scale_col(dominant_pop$MAP_VAR_v2)
-dominant_pop$ppt_scale <- scale_col(dominant_pop$MAP_v2)
-dominant_pop$rich_scale <- scale_col(dominant_pop$site_richness)
-dominant_pop$cov_scale <- scale_col(dominant_pop$initial_rel_cover)
-
-#remove year 0
-
-#dominant_pop <- dominant_pop %>% filter(!year_trt %in% c(0)) #remove pre-treatment year
-
-unique(dominant_pop$site_code[is.na(dominant_pop$MAP_v2)])
-
-cor(dominant_pop[,c('ppt_scale','ppt_var_scale','site_richness')])
-cor(dominant_pop[,c('ppt_scale','ppt_var_scale','rich_scale','cov_scale','plotfreq')])
-
-# ggsave(paste0('Graphs/FigS1-predictor-corr_',Sys.Date(),'.png'),
-#        ggpairs(dominant_pop[,c('initial_rel_cover','site_richness','MAP_v2','MAP_VAR_v2')],
-#         columnLabels = c('Initial\nRelative Cover','Site Richness','Mean Annual\nPrecipitation','CV of MAP'),
-#         axisLabels="none"),
-#        width = 10, height = 10)
-
-pairs(dominant_pop[,c('initial_rel_cover','site_richness','MAP_v2','MAP_VAR_v2')], pch = 21,  cex = 1,
-      bg = 'cadetblue3', col = 'black',
-      labels = c('Initial\nRelative Cover','Site Richness','Mean Annual\nPrecipitation','CV of MAP'),
-      lower.panel=NULL)
 
 #### Model of rank decay ####
 
@@ -140,11 +94,11 @@ nrow(rank_avg %>% filter(avg_rank == 1)) / nrow(rank_avg) ## 22.1%
 nrow(rank_avg %>% filter(avg_rank == 1, max_year >= 10)) / nrow(rank_avg %>%filter(max_year >= 10)) ## 9.1%
 
 
+# alternative code for arcsin transformation
 # asinTransform <- function(p) { asin(sqrt(p)) }
-
-logit
-
 # dominant_pop$rank_as <- asinTransform(dominant_pop$perc_rank)
+
+### logit transformation
 dominant_pop$rank_adj <- ifelse(dominant_pop$perc_rank == 1, 0.99,
                                 ifelse(dominant_pop$perc_rank == 0, 0.01, dominant_pop$perc_rank))
 dominant_pop$rank_logit <- logit(dominant_pop$rank_adj)
@@ -168,25 +122,23 @@ mod_rank <- lme(rank_logit ~ year_trt * initial_rel_cover * NPK * Fence +
                                  data = dom_complete)
 
 
-# 
-summary(mod_rank)$tTable
-anova(mod_rank)
-
+ # create summary table
 rank_table <- summary.tablefunc(mod_rank)
 
 rank_table <- rank_table %>% 
   mutate(order = if_else(Effect %in% grep('initial',rank_table$Effect, value = TRUE),2,
                    if_else(Effect %in% grep('lifespan',rank_table$Effect, value = TRUE),3,
                      if_else(Effect %in% grep('provenance',rank_table$Effect, value = TRUE),4,
-                       if_else(Effect %in% grep('richness',rank_table$Effect, value = TRUE),5,
-                         if_else(Effect %in% grep('func',rank_table$Effect, value = TRUE),6,
+                       if_else(Effect %in% grep('func',rank_table$Effect, value = TRUE),5,
+                        if_else(Effect %in% grep('richness',rank_table$Effect, value = TRUE),6,
                           if_else(Effect %in% grep('MAP_v2',rank_table$Effect, value = TRUE),7,
                            if_else(Effect %in% grep('MAP_VAR_v2',rank_table$Effect, value = TRUE),8,1)))))))) %>% 
   arrange(order)
 
 rank_table
 
-cor(dominant_pop[,c('MAP_v2','site_richness','MAP_VAR_v2','MAT_v2','initial_rel_cover')])
+#correlation
+cor(dominant_pop[!duplicated(dominant_pop$site_code) == FALSE,c('MAP_v2','site_richness','MAP_VAR_v2','MAT_v2')])
 
 r.squaredGLMM(mod_rank)
 # 
@@ -243,6 +195,15 @@ aic.tab
 
 ## define function for determining graphical display of continuous gradients
 
+# create color palette for graphs
+display.brewer.pal(11, "Blues")
+brewer.pal(11, "Blues")
+
+pos <- position_dodge(0.5)
+
+ctrl_pal <- c('black',"#D53E4F","#6BAED6","#5E4FA2")
+
+# define estimate of continuous variable to graph
 # upper <- function(x) max(x)
 # lower <- function(x) min(x)
 upper <- function(x) quantile(x, 0.95)
@@ -250,8 +211,6 @@ lower <- function(x) quantile(x, 0.05)
 # upper <- function(x) mean(x) + (sd(x)*1.5)
 # lower <- function(x) mean(x) - (sd(x)*1.5)
 
-
-upper(dominant_pop$initial_rel_cover)
 
 
 #create discrete categories for graphing purporses
@@ -266,36 +225,38 @@ dominant_pop <- dominant_pop %>%
 
 #* lifespan effect --------
 
-
 rank_table %>% filter(Effect %in% grep('lifespan',rank_table$Effect, value = TRUE))
 
 ### all sig
 
+### get model estimates at specified covariate levels
 rank_life_emm <- data.frame(summary(emmeans(mod_rank, pairwise ~ NPK * Fence | local_lifespan * year_trt,
                                             at = list(year_trt = seq(from = 0, to = 15, by = 1)),
                                             cov.reduce = TRUE,
                                             type = "response")$emmeans))
 
+# rename treatments
 rank_life_emm <- rank_life_emm %>%
   mutate(trt = if_else(NPK == 0 & Fence == 0, 'Control',
                        if_else(NPK == 0 & Fence == 1, 'Fence',
                                if_else(NPK == 1 & Fence == 0, 'NPK',
                                        if_else(NPK == 1 & Fence == 1, 'NPK+Fence',NULL)))))
 
-rank_table %>% filter(Effect %in% grep('lifespan',rank_table$Effect, value = TRUE))
-
+# code in significance
 #rank_life_emm$sig <- ifelse(rank_life_emm$trt == 'NPK+Fence','No','Yes')
 rank_life_emm$sig <- 'Yes'
 
+#back transformation for arcsin
 # rank_life_emm$em_btrans <- sin(rank_life_emm$emmean)^2
 # rank_life_emm$low_btrans <- sin(rank_life_emm$lower.CL)^2
 # rank_life_emm$up_btrans <- sin(rank_life_emm$upper.CL)^2
 
+#back transformation for logit
 rank_life_emm$em_btrans <- invlogit(rank_life_emm$emmean)
 rank_life_emm$low_btrans <- invlogit(rank_life_emm$lower.CL)
 rank_life_emm$up_btrans <- invlogit(rank_life_emm$upper.CL)
 
-
+#create graph
 gg_rank_year_life_trt <- ggplot(rank_life_emm, aes(x = year_trt, y = em_btrans, col = trt)) +
   geom_jitter(data = dominant_pop, aes(x=year_trt, y = perc_rank),  width=0.2, alpha = 0.7, col = 'grey90') +
   geom_ribbon(aes(ymin = low_btrans,ymax= up_btrans,fill=trt),alpha=0.15,color=NA) +
@@ -310,6 +271,7 @@ gg_rank_year_life_trt <- ggplot(rank_life_emm, aes(x = year_trt, y = em_btrans, 
   facet_grid(~local_lifespan)
 gg_rank_year_life_trt
 
+# code for saving individually, but will stitch these together later on
 # ggsave(paste0('Graphs/Presentation/rank-decay-lifespan_',Sys.Date(),'.png'),
 #        gg_rank_year_life_trt, width = 12, height = 8, units = "in", dpi = 600)
 
@@ -317,7 +279,7 @@ gg_rank_year_life_trt
 #* provenance effect --------
 
 rank_table %>% filter(Effect %in% grep('provenance',rank_table$Effect, value = TRUE))
-### Fence, NPK marginal
+### Fence sig, NPK marginal
 
 rank_prov_emm <- data.frame(summary(emmeans(mod_rank, pairwise ~ NPK * Fence | local_provenance * year_trt,
                                             at = list(year_trt = seq(from = 0, to = 15, by = 1)),
@@ -340,6 +302,9 @@ rank_prov_emm$em_btrans <- invlogit(rank_prov_emm$emmean)
 rank_prov_emm$low_btrans <- invlogit(rank_prov_emm$lower.CL)
 rank_prov_emm$up_btrans <- invlogit(rank_prov_emm$upper.CL)
 
+# rename factors for nicer labels
+rank_prov_emm$local_provenance <- ifelse(rank_prov_emm$local_provenance == 'NAT','Native','Non-native')
+dom_complete$local_provenance <- ifelse(dom_complete$local_provenance == 'NAT','Native','Non-native')
 
 gg_rank_year_prov_trt <- ggplot(rank_prov_emm, aes(x = year_trt, y = em_btrans, col = trt)) +
   geom_jitter(data = dom_complete, aes(x=year_trt, y = perc_rank),  width=0.2, alpha = 0.7, col = 'grey90') +
@@ -383,6 +348,9 @@ rank_func_emm$em_btrans <- invlogit(rank_func_emm$emmean)
 rank_func_emm$low_btrans <- invlogit(rank_func_emm$lower.CL)
 rank_func_emm$up_btrans <- invlogit(rank_func_emm$upper.CL)
 
+# rename factors for nicer labels
+rank_func_emm$func_simple <- ifelse(rank_func_emm$local_provenance == 'GRAMINOID','Graminoid','Non-graminoid')
+dom_complete$func_simple <- ifelse(dom_complete$local_provenance == 'GRAMINOID','Graminoid','Non-graminoid')
 
 gg_rank_year_func_trt <- ggplot(rank_func_emm, aes(x = year_trt, y = em_btrans, col = trt)) +
   geom_jitter(data = dom_complete, aes(x=year_trt, y = perc_rank),  width=0.2, alpha = 0.8, col = 'grey90') +
@@ -424,14 +392,12 @@ rank_init_emm <- rank_init_emm %>%
                                        if_else(NPK == 1 & Fence == 1, 'NPK+Fence',NULL)))))
 
 rank_init_emm$initial_cover <- factor(ifelse(rank_init_emm$initial_rel_cover == cov.low, 'Low Initial Cover','High Initial Cover'), levels = c('Low Initial Cover','High Initial Cover'))
-#rank_init_emm$upper.CL <- ifelse(rank_init_emm$upper.CL > 1.05, 1.05, rank_init_emm$upper.CL)
-#rank_init_emm$lower.CL <- ifelse(rank_init_emm$lower.CL < 0, 0, rank_init_emm$lower.CL)
 
 # rank_init_emm$em_btrans <- sin(rank_init_emm$emmean)^2
 # rank_init_emm$low_btrans <- sin(rank_init_emm$lower.CL)^2
 # rank_init_emm$up_btrans <- sin(rank_init_emm$upper.CL)^2
-#### should negative arcsin values be set to 0 on backtransformation (otherwise artificial uptick due to sin)?
 
+#### should negative arcsin values be set to 0 on backtransformation (otherwise artificial uptick due to sin)?
 rank_init_emm$em_btrans <- invlogit(rank_init_emm$emmean)
 rank_init_emm$low_btrans <- invlogit(rank_init_emm$lower.CL)
 rank_init_emm$up_btrans <- invlogit(rank_init_emm$upper.CL)
@@ -482,8 +448,6 @@ rank_rich_emm$sig <- ifelse(rank_rich_emm$trt %in% c('Fence','NPK+Fence'),'No','
 
 
 rank_rich_emm$richness <- factor(ifelse(rank_rich_emm$site_richness == rich.low, 'Low site richness','High site richness'), levels = c('Low site richness','High site richness'))
-# rank_rich_emm$upper.CL <- ifelse(rank_rich_emm$upper.CL > 1.05, 1.05, rank_rich_emm$upper.CL)
-# rank_rich_emm$lower.CL <- ifelse(rank_rich_emm$lower.CL < 0, 0, rank_rich_emm$lower.CL)
 
 # rank_rich_emm$em_btrans <- sin(rank_rich_emm$emmean)^2
 # rank_rich_emm$low_btrans <- sin(rank_rich_emm$lower.CL)^2
@@ -542,8 +506,6 @@ rank_map_emm$sig <- ifelse(rank_map_emm$trt %in% c('NPK','NPK+Fence'),'No','Yes'
 
 
 rank_map_emm$ppt <- factor(ifelse(rank_map_emm$MAP_v2 == map.low, 'Low MAP','High MAP'), levels = c('Low MAP','High MAP'))
-# rank_map_emm$upper.CL <- ifelse(rank_map_emm$upper.CL > 1.05, 1.05, rank_map_emm$upper.CL)
-#rank_map_emm$lower.CL <- ifelse(rank_map_emm$lower.CL < 0, 0, rank_map_emm$lower.CL)
 
 # rank_map_emm$em_btrans <- sin(rank_map_emm$emmean)^2
 # rank_map_emm$low_btrans <- sin(rank_map_emm$lower.CL)^2
@@ -570,7 +532,6 @@ gg_rank_year_ppt_trt <- ggplot(rank_map_emm, aes(x = year_trt, y = em_btrans, co
 
 gg_rank_year_ppt_trt
 
-
 #* MAP VAR effect ----
 
 rank_table %>% filter(Effect %in% grep('MAP_VAR_v2',rank_table$Effect, value = TRUE))
@@ -596,8 +557,6 @@ rank_pptvar_emm$sig <- ifelse(rank_pptvar_emm$trt %in% c('Fence','NPK','NPK+Fenc
 
 
 rank_pptvar_emm$pptvar <- factor(ifelse(rank_pptvar_emm$MAP_VAR_v2 == mvar.low, 'Low PPT Variation','High PPT Variation'), levels = c('Low PPT Variation','High PPT Variation'))
-# rank_pptvar_emm$upper.CL <- ifelse(rank_pptvar_emm$upper.CL > 1.05, 1.05, rank_pptvar_emm$upper.CL)
-# rank_pptvar_emm$lower.CL <- ifelse(rank_pptvar_emm$lower.CL < 0, 0, rank_pptvar_emm$lower.CL)
 
 # rank_pptvar_emm$em_btrans <- sin(rank_pptvar_emm$emmean)^2
 # rank_pptvar_emm$low_btrans <- sin(rank_pptvar_emm$lower.CL)^2
