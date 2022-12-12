@@ -99,14 +99,18 @@ working_coverdat <- coverdat[coverdat$site_code %in% sites,]
 #           '/Users/wilf0020/Library/Mobile Documents/com~apple~CloudDocs/Documents/NutNet manuscripts/Initial dominance/Data/site list.csv')
 
 
-
+# reduce to just vascular plants
 working_coverdat <- droplevels(working_coverdat) %>% 
   filter(live == 1, !functional_group %in% c('BRYOPHYTE','LICHEN','LIVERWORT'), max_cover != 0) %>% 
   group_by(site_code) %>% 
   mutate(max_year = max(year_trt))  ##  add in max years
 
-working_coverdat[working_coverdat$Taxon == 'RUMEX SP.',]$local_lifespan <- 'PERENNIAL'
 
+# working_coverdat[working_coverdat$Taxon == 'RUMEX SP.',]$local_lifespan <- 'PERENNIAL'
+# working_coverdat %>% filter(substr(Taxon,1,5) == 'RUMEX' & site_code == 'yarra.au')
+
+
+### reduce functional groups
 working_coverdat$functional_group <- ifelse(working_coverdat$functional_group %in% c('GRASS','GRAMINOID'), 'GRAMINOID',working_coverdat$functional_group)
 
 ### doane.us only sampled block 1 after pre-treatment year
@@ -232,72 +236,73 @@ cover_max <- left_join(cover_max_fix,cover_max %>%
                          distinct(Taxon,.keep_all = TRUE),
                        by='Taxon')
 
-### uses relative cover here
+### use relative cover to determine rank percentile
 
 working_coverdat <- cover_max %>% 
   group_by(site_code, year_trt, plot) %>% 
-  mutate(rel_cover = max_cover / sum(max_cover)) %>%  
+  mutate(rel_cover = max_cover / sum(max_cover)) %>%  # calc rel cover
   mutate(cover = rel_cover) %>%  #use relative cover
   #mutate(cover = max_cover) %>%  # use absolute cover
   mutate(rank = min_rank(desc(rel_cover)), rich = n()) %>% 
-  mutate(perc_rank = (rich + 1 - rank)/rich) %>% 
+  mutate(perc_rank = (rich + 1 - rank)/rich) %>%  #calculate percentile rank
   filter(year_trt >= 0) %>% 
   group_by(site_code) %>% 
-  mutate(nplots = n_distinct(plot)) %>% 
+  mutate(nplots = n_distinct(plot)) %>% # number of plots in a given site
   ungroup() %>%   
   group_by(site_code, Taxon,year_trt) %>% 
-  mutate(nplot = n_distinct(plot)) %>% 
-  mutate(plotfreq_yr = nplot/nplots)
+  mutate(nplot = n_distinct(plot)) %>%  # number of plots taxon is found in
+  mutate(plotfreq_yr = nplot/nplots)  # calculate plot frequency
 
-#229472
+#229472 species records remaining
 
-### calculate the frequency of a species in all pre-treatment plots
-cover_pre <- working_coverdat[working_coverdat$year_trt == 0 & working_coverdat$live == 1,] %>% 
-  filter(year_trt == 0) %>% 
-  group_by(site_code, Taxon) %>% 
-  mutate(avgCover = mean(cover)) %>% 
-  mutate(avgRankPerc = mean(perc_rank)) %>% 
-  mutate(plotfreq = plotfreq_yr) %>% 
+### calculate the frequency, average cover, average rank of a species in all pre-treatment plots
+cover_pre <- working_coverdat[working_coverdat$year_trt == 0 & working_coverdat$live == 1,] %>%
+  filter(year_trt == 0) %>%
+  group_by(site_code, Taxon) %>%
+  mutate(avgCover = mean(cover)) %>%
+  mutate(avgRankPerc = mean(perc_rank)) %>%
+  mutate(plotfreq = plotfreq_yr) %>%
   ungroup
-
-range(cover_pre$avgCover)
-hist(cover_pre$avgCover)
-
-range(cover_pre$avgRankPerc)
-hist(cover_pre$avgRankPerc)
+# 
+# range(cover_pre$avgCover)
+# hist(cover_pre$avgCover)
+# 
+# range(cover_pre$avgRankPerc)
+# hist(cover_pre$avgRankPerc)
 
 
 ### create initial dominance data.frame
 
-### this code selects initial dominants based on single most dominant species
+### this code selects initial dominants based on most dominant species
 initial_dominants <- working_coverdat %>%
   filter(year_trt == 0) %>%
   group_by(site_code,plot)  %>%
-  slice_max(order_by = max_cover,with_ties = TRUE) %>%   #2947
+  slice_max(order_by = max_cover,with_ties = TRUE) %>%   # TRUE allows ties (multiple dominants per plot)
   mutate(initial_rel_cover = cover, initial_abs_cover = max_cover) %>% 
   dplyr::select(site_code,plot,Taxon,initial_rel_cover,initial_abs_cover) 
   # summarize(Taxon = Taxon[which.max(cover)], initial_abs_cover = max_cover[which.max(cover)], 
   #           initial_rel_cover = cover[which.max(cover)])
   # 2715 with_ties = FALSE
-  # ~200 ties.
+  # 2947 with ties = TRUE
 
-initial_dominants %>% mutate(id = paste0(site_code,'.',plot)) %>% 
-  group_by(id) %>% filter(n() > 1) %>% 
-  dplyr::select(site_code,plot,Taxon,initial_rel_cover) %>% print(n=400) 
-## certainly seems that some sites are more likely to have 'ties' than others.
-## Trying to cast forward to select 'dominant' introduces bias in subsequent analysis, but is that problematic?
-
-initial_dominants %>% mutate(id = paste0(site_code,'.',plot)) %>% 
-  group_by(id) %>% filter(n() > 1) %>% 
-  left_join(.,working_coverdat %>% filter(year_trt == 1) %>% 
-              #mutate(id = paste0(site_code,'.',plot)) %>% 
-              ungroup() %>% 
-              dplyr::select(site_code,plot,Taxon,max_cover),
-            by = c('site_code','plot','Taxon')
-            ) %>% 
-  slice_max(order_by = max_cover,with_ties = TRUE) %>% 
-  group_by(id) %>% filter(n() > 1) %>% 
-  dplyr::select(site_code,plot,Taxon,initial_rel_cover) %>% print(n=400) 
+## for exploring what TIES look like
+# initial_dominants %>% mutate(id = paste0(site_code,'.',plot)) %>% 
+#   group_by(id) %>% filter(n() > 1) %>% 
+#   dplyr::select(site_code,plot,Taxon,initial_rel_cover) %>% print(n=400) 
+# ## certainly seems that some sites are more likely to have 'ties' than others.
+# ## Trying to cast forward to select 'dominant' introduces bias in subsequent analysis, but is that problematic?
+# 
+# initial_dominants %>% mutate(id = paste0(site_code,'.',plot)) %>% 
+#   group_by(id) %>% filter(n() > 1) %>% 
+#   left_join(.,working_coverdat %>% filter(year_trt == 1) %>% 
+#               #mutate(id = paste0(site_code,'.',plot)) %>% 
+#               ungroup() %>% 
+#               dplyr::select(site_code,plot,Taxon,max_cover),
+#             by = c('site_code','plot','Taxon')
+#             ) %>% 
+#   slice_max(order_by = max_cover,with_ties = TRUE) %>% 
+#   group_by(id) %>% filter(n() > 1) %>% 
+#   dplyr::select(site_code,plot,Taxon,initial_rel_cover) %>% print(n=400) 
 ### 19 repeats remain in year 2
 ### Going to keep repeats for now. Will need to repair code down the line
 
@@ -305,9 +310,10 @@ initial_dominants %>% mutate(id = paste0(site_code,'.',plot)) %>%
 ## merge to multi-year data and expand grid to include zero for years where spp is missing
 dominant_year <- droplevels(initial_dominants[,c('site_code','plot','Taxon')]) %>% 
   left_join(working_coverdat[,c('site_code','plot','Taxon','cover','max_cover','rank','perc_rank','year_trt','max_year')],by = c('site_code','plot','Taxon')) %>% 
-  group_by(site_code, plot) %>% 
-  complete(year_trt = 0:max_year,nesting(Taxon,max_year), fill = list(cover =0, max_cover = 0, perc_rank=0)) %>%  # this adds about 3000 entries (from 16,000), which seems reasonable but needs a little testing
+  # group_by(site_code, plot) %>% 
+  # complete(year_trt = 0:max_year,nesting(Taxon,max_year), fill = list(cover =0, max_cover = 0, perc_rank=0)) %>%  # this adds about 3000 0 entries (from 20,000 filled in)
   filter(!is.na(site_code))
+# 23586
 
 
 ## some sites skipped a sampling year, need to weed those years out (will be all zeros now)
@@ -333,46 +339,45 @@ scale_col <- function(x){
   (x - mean(x, na.rm=TRUE)) / sd(x, na.rm=TRUE)
 }
 
-comb_soil <- comb %>% 
-  dplyr::select(c('site_code','year_trt',"pct_C",'pct_N','ppm_P','ppm_K','ppm_Ca')) %>% 
-  filter(year_trt == 0) %>% 
-  mutate(c = scale_col(pct_C),n = scale_col(pct_N),p = scale_col(ppm_P),
-         k = scale_col(ppm_K), ca = scale_col(ppm_Ca)) %>%
-  group_by(site_code) %>% 
-  summarize(c = var(c, na.rm = TRUE),
-            n = var(n, na.rm = TRUE),
-            p = var(p, na.rm = TRUE),
-            k = var(k, na.rm = TRUE),
-            ca = var(ca, na.rm = TRUE)) %>% 
-  mutate(soil_var = rowMeans(dplyr::select(.,c(c,n,p,k,ca)),na.rm = TRUE))
+# comb_soil <- comb %>% 
+#   dplyr::select(c('site_code','year_trt',"pct_C",'pct_N','ppm_P','ppm_K','ppm_Ca')) %>% 
+#   filter(year_trt == 0) %>% 
+#   mutate(c = scale_col(pct_C),n = scale_col(pct_N),p = scale_col(ppm_P),
+#          k = scale_col(ppm_K), ca = scale_col(ppm_Ca)) %>%
+#   group_by(site_code) %>% 
+#   summarize(c = var(c, na.rm = TRUE),
+#             n = var(n, na.rm = TRUE),
+#             p = var(p, na.rm = TRUE),
+#             k = var(k, na.rm = TRUE),
+#             ca = var(ca, na.rm = TRUE)) %>% 
+#   mutate(soil_var = rowMeans(dplyr::select(.,c(c,n,p,k,ca)),na.rm = TRUE))
 
 ### put it all together
 dominant_pop <- initial_dominants %>% 
   #mutate(id = paste(site_code,plot,Taxon,sep='.')) %>% 
-  left_join(.,dominant_year[,c('site_code','plot','Taxon','max_cover','cover','perc_rank','year_trt','plotfreq_yr')],
+  left_join(.,dominant_year[,c('site_code','plot','Taxon','max_cover','cover','perc_rank','year_trt')],
             by=c('site_code'='site_code','plot'='plot','Taxon'='Taxon')) %>% 
-  left_join(.,cover_pre[, c('site_code','plot','trt','Taxon',"local_provenance", "local_lifespan", "functional_group",'plotfreq','avgCover')],
+  left_join(.,cover_pre[, c('site_code','plot','trt','Taxon',"local_provenance", "local_lifespan", "functional_group",'avgCover')],
             by=c('site_code'='site_code','plot'='plot','Taxon'='Taxon')) %>% 
   left_join(.,comb[!duplicated(comb$site_code),
                    c('site_code','site_richness',"MAP_VAR_v2","MAP_v2","MAT_v2","TEMP_VAR_v2")],
             by = 'site_code') %>% 
   left_join(.,comb[comb$year_trt == 0,c('site_code','plot','vascular_live_mass','litter_mass')], by = c('site_code','plot')) %>% 
     rename(initial_live_mass = vascular_live_mass, initial_litter_mass = litter_mass) %>% 
-  left_join(.,comb_soil[,c('site_code','soil_var')],by='site_code') %>% 
+  # left_join(.,comb_soil[,c('site_code','soil_var')],by='site_code') %>% 
   filter(trt %in% c('Control','NPK','Fence','NPK+Fence')) %>% 
   mutate(NPK = if_else(trt %in% c('NPK','NPK+Fence'),1,0), Fence = if_else(trt %in% c('Fence','NPK+Fence'),1,0))
 
+#9126 records of initial dominants through time
 
-#domMissByYear <- dominant_pop[dominant_pop$year1_change == 0,]
+# Can we fill in missing lifespan/provenance/func_group?
 
 dominant_pop[dominant_pop$local_lifespan == 'NULL',] # 305
 
 unique(dominant_pop$Taxon[dominant_pop$local_lifespan == 'NULL']) # 5
 
-
 dominant_pop[dominant_pop$Taxon %in% c('NARDUS STRICTA','LOLIUM MULTIFLORUM',"ELYMUS SPICATUS"),]$local_lifespan <- 'PERENNIAL'
 dominant_pop[dominant_pop$Taxon %in% c('DAUCUS CAROTA'),]$local_lifespan <- 'BIENNIAL'
-
 
 #for now. poa sp. at koffler is likely perennial (poa pratensis or trivialis)
 dominant_pop$local_lifespan <- ifelse(dominant_pop$local_lifespan %in% c('PERENNIAL','INDETERMINATE','NULL'), 'PERENNIAL','ANNUAL')
@@ -427,7 +432,6 @@ dominant_pop[dominant_pop$Taxon == "SETARIA SP.",]$local_provenance <- 'NAT'
 
 
 #    "NARDUS STRICTA" 
-
 dominant_pop %>% filter(Taxon == "NARDUS STRICTA") %>% distinct(site_code) %>% print(n=100)
 dominant_pop[dominant_pop$Taxon == "NARDUS STRICTA",]$local_provenance <- 'NAT'
 
@@ -439,7 +443,7 @@ dominant_pop %>% filter(Taxon == "AGROSTIS SP.") %>% distinct(site_code) %>% pri
 dominant_pop[dominant_pop$Taxon == "AGROSTIS SP.",]$local_provenance <- 'NAT'
 
 dominant_pop[dominant_pop$local_provenance == 'NULL',] # 0
-unique(dominant_pop$Taxon[dominant_pop$local_provenance == 'UNK']) # 9
+unique(dominant_pop$Taxon[dominant_pop$local_provenance == 'UNK']) # 4
 
 # "AMBROSIA ARTEMISIIFOLIA"
 
@@ -449,7 +453,6 @@ dominant_pop[dominant_pop$Taxon == "AMBROSIA ARTEMISIIFOLIA",]$local_provenance 
 
 
 # "HIERACIUM SP."           
-
 dominant_pop %>% filter(Taxon == "HIERACIUM SP.") %>% distinct(site_code) %>% print(n=100)
 sort(unique(working_coverdat$Taxon[working_coverdat$site_code == 'kbs.us']))
 # not solvable
@@ -476,6 +479,7 @@ unique(dominant_pop$Taxon[dominant_pop$functional_group == 'FORB']) #89
 ### 7778 as of 2022-02-02
 ### 8908 with multiple initial dominants as of 2022-07-30
 ### 9126 with multiple initial dominants as of 2022-10-19
+### 9118 with multiple initial dominants as of 2022-12-09
 
 
 ### add year 0 site richness
@@ -489,72 +493,21 @@ dominant_pop <- left_join(dominant_pop,
                               by = 'site_code')
 
 
-write.csv(dominant_pop,
-          paste0('/Users/wilf0020/Library/Mobile Documents/com~apple~CloudDocs/Documents/NutNet manuscripts/Initial dominance/Project/initial-dominance/Data/Dominants-through-time_',
-          Sys.Date(),'.csv'),
-          row.names = F)
+# write.csv(dominant_pop,
+#           paste0('/Users/wilf0020/Library/Mobile Documents/com~apple~CloudDocs/Documents/NutNet manuscripts/Initial dominance/Project/initial-dominance/Data/Dominants-through-time_',
+#           Sys.Date(),'.csv'),
+#           row.names = F)
 
-# #### Community changes ####
-# ### calculate RAC curves of communities INDEPENDENT of the initial dominant
-# 
-# working_coverdat$id <- paste(working_coverdat$site_code,working_coverdat$plot,sep='_')
-# 
-# rich_subord <- working_coverdat %>%
-#   filter(trt %in% c('Control','NPK','Fence','NPK+Fence')) %>%
-#   left_join(.,dominant_pop %>% mutate(dom = 'YES') %>%
-#               dplyr::select(site_code,plot,year_trt,Taxon,dom),
-#             by = c('site_code','plot','year_trt','Taxon')) %>%
-#   mutate(dom = if_else(is.na(dom),'NO',dom)) %>%
-#   filter(!dom == 'YES') %>%
-#   group_by(site_code,plot,year_trt) %>%
-#   summarize(subord_rich = n())
-# 
-# cover_subord <- working_coverdat %>% 
-#   filter(trt %in% c('Control','NPK','Fence','NPK+Fence')) %>% 
-#   left_join(.,dominant_pop %>% mutate(dom = 'YES') %>% dplyr::select(site_code,plot,Taxon,dom),
-#             by = c('site_code','plot','Taxon')) %>% 
-#   mutate(dom = if_else(is.na(dom),'NO',dom)) %>%
-#   filter(!dom == 'YES')
-# 
-# rac_out <- RAC_change(df = cover_subord,
-#                       species.var = 'Taxon',
-#                       abundance.var = 'max_cover',
-#                       replicate.var = 'id',
-#                       time.var = 'year_trt',
-#                       reference.time = 0)
-# 
-# rich_subord %>% filter(site_code == 'cdcr.us' & plot == 1) %>% dplyr::select(year_trt,subord_rich) %>% print(n=1000)
-# working_coverdat %>% filter(site_code == 'cdcr.us' & plot == 1) %>% dplyr::select(year_trt,trt,Taxon,max_cover) %>% arrange(year_trt,max_cover) %>% print(n=1000)
-# 
-# cor(rac_out[!is.na(rac_out$evenness_change),4:8])
-# 
-# ggpairs(rac_out[!is.na(rac_out$evenness_change),4:8],upper = list(continuous = wrap("cor", size = 10)))
-# 
-# dom_comm <- dominant_pop %>% 
-#   filter(year_trt == 0) %>% 
-#   dplyr::select(-year_trt) %>% 
-#   mutate(id = paste(site_code,plot, sep = '_')) %>% 
-#   left_join(rac_out, by='id') %>% 
-#   filter(trt %in% c('Control','NPK','Fence','NPK+Fence')) %>% 
-#   mutate(NPK = if_else(trt %in% c('NPK','NPK+Fence'),1,0), Fence = if_else(trt %in% c('Fence','NPK+Fence'),1,0)) %>% 
-#   mutate(ppt_var = as.numeric(MAP_VAR_v2)) %>% 
-#   dplyr::select(-year_trt) %>% rename(year_trt = year_trt2) %>% 
-#   left_join(.,comb %>% 
-#               dplyr::select(site_code,plot,year_trt,vascular_live_mass,unsorted_live_mass,rich,evenness),
-#             by=c('site_code','plot','year_trt')) %>% 
-#   left_join(.,rich_subord %>% dplyr::select(site_code,plot,year_trt,subord_rich),
-#             by=c('site_code','plot','year_trt'))
-# 
-# dominant_pop %>% 
-#   filter(year_trt == 0) %>% 
-#   mutate(id = paste(site_code,plot, sep = '_')) %>% 
-#   filter(!id %in% rac_out$id)
-# 
-# working_coverdat %>% filter(id == 'ethamc.au_1') %>% dplyr::select(year_trt,Taxon) %>% print(n=100)
-# # so plots with only one species in pre-treatment are getting filtered out here. 29 total, going to go forward without them
-# 
-# # write.csv(dom_comm,
-# #           paste0('/Users/wilf0020/Library/Mobile Documents/com~apple~CloudDocs/Documents/NutNet manuscripts/Initial dominance/Project/initial-dominance/Data/RAC-subordinate_',Sys.Date(),'.csv'),
-# #           row.names = F)
+### create site charactersistics table
 
+site_tab <- comb %>% filter(site_code %in% dominant_pop$site_code) %>% 
+  group_by(site_code) %>%
+  mutate(max_year = max(year_trt)) %>% filter(year_trt == max_year) %>%
+  distinct(site_code, .keep_all = TRUE) %>% 
+  dplyr::select(site_name, site_code, continent, country, experiment_type, latitude, longitude, MAP_v2, MAP_VAR_v2) %>% 
+  left_join(.,dominant_pop %>% group_by(site_code) %>% distinct(site_code,.keep_all = TRUE) %>% dplyr::select(site_code,site_rich_0),
+            by='site_code')
 
+write_csv(site_tab,
+         '/Users/wilf0020/Library/Mobile Documents/com~apple~CloudDocs/Documents/NutNet manuscripts/Initial dominance/Project/initial-dominance/Data/site_table.csv'
+)
