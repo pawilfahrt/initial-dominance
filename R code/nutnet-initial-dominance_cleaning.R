@@ -92,7 +92,7 @@ sites <- sort(unique(working_coverdat$site_code[working_coverdat$year_trt == 0])
 
 #89 sites
 
-working_coverdat <- coverdat[coverdat$site_code %in% sites,]
+working_coverdat <- working_coverdat[working_coverdat$site_code %in% sites,]
 
 
 # write.csv(sites,
@@ -104,10 +104,6 @@ working_coverdat <- droplevels(working_coverdat) %>%
   filter(live == 1, !functional_group %in% c('BRYOPHYTE','LICHEN','LIVERWORT'), max_cover != 0) %>% 
   group_by(site_code) %>% 
   mutate(max_year = max(year_trt))  ##  add in max years
-
-
-# working_coverdat[working_coverdat$Taxon == 'RUMEX SP.',]$local_lifespan <- 'PERENNIAL'
-# working_coverdat %>% filter(substr(Taxon,1,5) == 'RUMEX' & site_code == 'yarra.au')
 
 
 ### reduce functional groups
@@ -188,6 +184,28 @@ working_coverdat <- rbind(working_coverdat,
 working_coverdat %>%
   filter(site_code == 'cbgb.us', substr(Taxon,1,5) == 'SCHIZ', plot == 61, year_trt %in% c(2,3,4)) %>% 
   dplyr::select(plot, year_trt, Taxon, max_cover, local_lifespan)
+
+#### cover values over 100?
+
+working_coverdat %>% filter(max_cover > 100) %>% dplyr::select(year,date,site_code,plot,Taxon,max_cover)
+# 2019 2019-09-18 bayr.de       7 LUZULA CAMPESTRIS           235
+working_coverdat %>% filter(site_code == 'bayr.de' & plot == 7 & Taxon == 'LUZULA CAMPESTRIS')
+## going to use spring value - like value is 25 or 35, spring is 30 so seems reasonable
+working_coverdat$max_cover <- ifelse(working_coverdat$max_cover == 235, 30, working_coverdat$max_cover)
+
+working_coverdat %>% filter(site_code == 'saana.fi' & plot == 3 & Taxon == 'ANTHRISCUS SYLVESTRIS') 
+# these do get quite high in later years it appears, setting to 100
+working_coverdat$max_cover <- ifelse(working_coverdat$max_cover >150 , 100, working_coverdat$max_cover)
+
+working_coverdat %>% filter(site_code == 'saana.fi' & plot == 35 & Taxon == 'ANTHRISCUS SYLVESTRIS') 
+# hmm, these also get higher but max at 80. I'll set to 80
+working_coverdat$max_cover <- ifelse(working_coverdat$max_cover == 130 , 80, working_coverdat$max_cover)
+
+working_coverdat %>% filter(site_code == 'ukul.za' & plot == 13 & Taxon == 'TRAGIA MEYERIANA') 
+# should be 12 looks like
+working_coverdat$max_cover <- ifelse(working_coverdat$max_cover == 120, 12, working_coverdat$max_cover)
+
+
 
 #### take only maximum cover value when multiple are present in a year (for some taxa fixes and sites with multiple sampling dates)
 
@@ -310,8 +328,8 @@ initial_dominants <- working_coverdat %>%
 ## merge to multi-year data and expand grid to include zero for years where spp is missing
 dominant_year <- droplevels(initial_dominants[,c('site_code','plot','Taxon')]) %>% 
   left_join(working_coverdat[,c('site_code','plot','Taxon','cover','max_cover','rank','perc_rank','year_trt','max_year')],by = c('site_code','plot','Taxon')) %>% 
-  # group_by(site_code, plot) %>% 
-  # complete(year_trt = 0:max_year,nesting(Taxon,max_year), fill = list(cover =0, max_cover = 0, perc_rank=0)) %>%  # this adds about 3000 0 entries (from 20,000 filled in)
+   group_by(site_code, plot) %>% 
+   complete(year_trt = 0:max_year,nesting(Taxon,max_year), fill = list(cover =0, max_cover = 0, perc_rank=0)) %>%  # this adds about 3000 0 entries (from 20,000 filled in)
   filter(!is.na(site_code))
 # 23586
 
@@ -335,22 +353,6 @@ dominant_year <- dominant_year %>%
 
 # 23171 with multiple initial dominants and Bakker fixs
 
-scale_col <- function(x){
-  (x - mean(x, na.rm=TRUE)) / sd(x, na.rm=TRUE)
-}
-
-# comb_soil <- comb %>% 
-#   dplyr::select(c('site_code','year_trt',"pct_C",'pct_N','ppm_P','ppm_K','ppm_Ca')) %>% 
-#   filter(year_trt == 0) %>% 
-#   mutate(c = scale_col(pct_C),n = scale_col(pct_N),p = scale_col(ppm_P),
-#          k = scale_col(ppm_K), ca = scale_col(ppm_Ca)) %>%
-#   group_by(site_code) %>% 
-#   summarize(c = var(c, na.rm = TRUE),
-#             n = var(n, na.rm = TRUE),
-#             p = var(p, na.rm = TRUE),
-#             k = var(k, na.rm = TRUE),
-#             ca = var(ca, na.rm = TRUE)) %>% 
-#   mutate(soil_var = rowMeans(dplyr::select(.,c(c,n,p,k,ca)),na.rm = TRUE))
 
 ### put it all together
 dominant_pop <- initial_dominants %>% 
@@ -368,18 +370,26 @@ dominant_pop <- initial_dominants %>%
   filter(trt %in% c('Control','NPK','Fence','NPK+Fence')) %>% 
   mutate(NPK = if_else(trt %in% c('NPK','NPK+Fence'),1,0), Fence = if_else(trt %in% c('Fence','NPK+Fence'),1,0))
 
-#9126 records of initial dominants through time
+#9221 records of initial dominants through time
 
 # Can we fill in missing lifespan/provenance/func_group?
 
 dominant_pop[dominant_pop$local_lifespan == 'NULL',] # 305
 
-unique(dominant_pop$Taxon[dominant_pop$local_lifespan == 'NULL']) # 5
+unique(dominant_pop$Taxon[dominant_pop$local_lifespan == 'NULL']) # 6
+
+dominant_pop %>% filter(Taxon == 'FORB SP.')
+working_coverdat %>% filter(site_code == 'lagoas.br' & plot == 20) %>% print(n=50)
+## there are 4 ties in this plot. I'm going to omit forb sp. as it is unidentified and unnecessary
+dominant_pop <- dominant_pop %>% filter(!Taxon  == 'FORB SP.')
 
 dominant_pop[dominant_pop$Taxon %in% c('NARDUS STRICTA','LOLIUM MULTIFLORUM',"ELYMUS SPICATUS"),]$local_lifespan <- 'PERENNIAL'
 dominant_pop[dominant_pop$Taxon %in% c('DAUCUS CAROTA'),]$local_lifespan <- 'BIENNIAL'
 
-#for now. poa sp. at koffler is likely perennial (poa pratensis or trivialis)
+unique(dominant_pop$Taxon[dominant_pop$local_lifespan == 'NULL']) # 2
+# "SETARIA SP."  "AGROSTIS SP." - Setaria is from unc.us - likely setaria parviflora as it was abundant in that field
+dominant_pop %>% filter(Taxon == 'AGROSTIS SP.') %>% print(n=50) #from veluwe.nl - listed as perennial on their taxa sheet, not sure why import failed
+
 dominant_pop$local_lifespan <- ifelse(dominant_pop$local_lifespan %in% c('PERENNIAL','INDETERMINATE','NULL'), 'PERENNIAL','ANNUAL')
 dominant_pop$functional_group <- ifelse(dominant_pop$functional_group %in% c('GRASS','GRAMINOID'), 'GRAMINOID',dominant_pop$functional_group)
 
@@ -470,16 +480,17 @@ unique(dominant_pop$Taxon[dominant_pop$functional_group == 'NULL']) # 1
 
 dominant_pop[dominant_pop$Taxon == "CAREX SP.",]$functional_group <- 'GRAMINOID'
 
-unique(dominant_pop$Taxon[dominant_pop$functional_group == 'WOODY']) # 23
+unique(dominant_pop$Taxon[dominant_pop$functional_group == 'WOODY']) # 26
 unique(dominant_pop$Taxon[dominant_pop$functional_group == 'LEGUME']) # 12
-unique(dominant_pop$Taxon[dominant_pop$functional_group == 'GRAMINOID']) #127
-unique(dominant_pop$Taxon[dominant_pop$functional_group == 'FORB']) #89
+unique(dominant_pop$Taxon[dominant_pop$functional_group == 'GRAMINOID']) #129
+unique(dominant_pop$Taxon[dominant_pop$functional_group == 'FORB']) #92
 
 
 ### 7778 as of 2022-02-02
 ### 8908 with multiple initial dominants as of 2022-07-30
 ### 9126 with multiple initial dominants as of 2022-10-19
 ### 9118 with multiple initial dominants as of 2022-12-09
+### 9208 with lagoas.br reinserted as of 2023-01-11
 
 
 ### add year 0 site richness
@@ -498,7 +509,7 @@ dominant_pop <- left_join(dominant_pop,
 #           Sys.Date(),'.csv'),
 #           row.names = F)
 
-### create site charactersistics table
+### create site characteristics table
 
 site_tab <- comb %>% filter(site_code %in% dominant_pop$site_code) %>% 
   group_by(site_code) %>%
@@ -509,5 +520,5 @@ site_tab <- comb %>% filter(site_code %in% dominant_pop$site_code) %>%
             by='site_code')
 
 # write_csv(site_tab,
-#          '/Users/wilf0020/Library/Mobile Documents/com~apple~CloudDocs/Documents/NutNet manuscripts/Initial dominance/Project/initial-dominance/Data/site_table.csv'
+#          '/Users/wilf0020/Library/Mobile Documents/com~apple~CloudDocs/Documents/NutNet manuscripts/Initial dominance/Project/initial-dominance/Data/site-table_2023-01-11.csv'
 # )
