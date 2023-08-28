@@ -51,11 +51,12 @@ files<-list.files()
 # coverfile<-last(coverfile)
 # original_coverdat <- read_csv(coverfile)
 
-original_coverdat <- read.csv('/Users/wilf0020/Library/CloudStorage/Dropbox/Peter/Cover and biomass by date/full-cover-by-date-2022-10-10.csv')
+original_coverdat <- read.csv('/Users/wilf0020/Library/CloudStorage/Dropbox/Peter/Cover and biomass by date/full-cover-by-date_2023-06-28.csv')
 coverdat <- original_coverdat # backup
 
 dim(coverdat)
-# 305412   x  21 - sorted by date
+# 305412   x  21 - 2022-10-10
+# 340720   x  21 - 2023-06-21
 
 comb_file<-files[grep("comb-by-plot-clim-soil-diversity", files)]
 comb_file<-last(comb_file)
@@ -75,7 +76,7 @@ length(sites)
 sort(sites)
 
 
-# 95
+# 96
 # just the sites we want
 working_coverdat <- coverdat[coverdat$site_code %in% sites,]
 
@@ -91,6 +92,8 @@ site.miss <- sites[!sites %in%  unique(working_coverdat$site_code[working_coverd
 sites <- sort(unique(working_coverdat$site_code[working_coverdat$year_trt == 0]))
 
 #89 sites
+# as of 2023-06-21 sval.no is included, but I'm going to keep site list to original submission for revision
+sites <- sites[!sites == 'sval.no']
 
 working_coverdat <- working_coverdat[working_coverdat$site_code %in% sites,]
 
@@ -139,7 +142,7 @@ working_coverdat %>%
 
 working_coverdat %>%
   filter(site_code == 'hopl.us', substr(Taxon,1,5) == 'AVENA',plot == 2) %>% 
-  select(plot, year_trt, Taxon, max_cover) %>% 
+  dplyr::select(plot, year_trt, Taxon, max_cover) %>% 
   print(n=60)
 
 ### sier.us	all	Bromus diandrus	We had problems early on separating B. diandrus and B. sterilis. You might need to combine these species, due uncertainty early in experiment
@@ -204,8 +207,6 @@ working_coverdat$max_cover <- ifelse(working_coverdat$max_cover == 130 , 80, wor
 working_coverdat %>% filter(site_code == 'ukul.za' & plot == 13 & Taxon == 'TRAGIA MEYERIANA') 
 # should be 12 looks like
 working_coverdat$max_cover <- ifelse(working_coverdat$max_cover == 120, 12, working_coverdat$max_cover)
-
-
 
 #### take only maximum cover value when multiple are present in a year (for some taxa fixes and sites with multiple sampling dates)
 
@@ -272,6 +273,7 @@ working_coverdat <- cover_max %>%
   mutate(plotfreq_yr = nplot/nplots)  # calculate plot frequency
 
 #229472 species records remaining
+#252549 - 2023-06-28
 
 ### calculate the frequency, average cover, average rank of a species in all pre-treatment plots
 cover_pre <- working_coverdat[working_coverdat$year_trt == 0 & working_coverdat$live == 1,] %>%
@@ -301,7 +303,7 @@ initial_dominants <- working_coverdat %>%
   # summarize(Taxon = Taxon[which.max(cover)], initial_abs_cover = max_cover[which.max(cover)], 
   #           initial_rel_cover = cover[which.max(cover)])
   # 2715 with_ties = FALSE
-  # 2947 with ties = TRUE
+  # 2947 with ties = TRUE - 3030 (revisions)
 
 ## for exploring what TIES look like
 # initial_dominants %>% mutate(id = paste0(site_code,'.',plot)) %>% 
@@ -332,7 +334,7 @@ dominant_year <- droplevels(initial_dominants[,c('site_code','plot','Taxon')]) %
    complete(year_trt = 0:max_year,nesting(Taxon,max_year), fill = list(cover =0, max_cover = 0, perc_rank=0)) %>%  # this adds about 3000 0 entries (from 20,000 filled in)
   filter(!is.na(site_code))
 # 23586
-
+# 26336 - 2023-06-28
 
 ## some sites skipped a sampling year, need to weed those years out (will be all zeros now)
 zero_year <- dominant_year %>% 
@@ -352,7 +354,7 @@ dominant_year <- dominant_year %>%
 
 
 # 23171 with multiple initial dominants and Bakker fixs
-
+# 25293 - 2023-06-21
 
 ### put it all together
 dominant_pop <- initial_dominants %>% 
@@ -371,10 +373,11 @@ dominant_pop <- initial_dominants %>%
   mutate(NPK = if_else(trt %in% c('NPK','NPK+Fence'),1,0), Fence = if_else(trt %in% c('Fence','NPK+Fence'),1,0))
 
 #9221 records of initial dominants through time
+#9995 - 2023-06-21
 
 # Can we fill in missing lifespan/provenance/func_group?
 
-dominant_pop[dominant_pop$local_lifespan == 'NULL',] # 305
+dominant_pop[dominant_pop$local_lifespan == 'NULL',] # 138
 
 unique(dominant_pop$Taxon[dominant_pop$local_lifespan == 'NULL']) # 6
 
@@ -383,7 +386,7 @@ working_coverdat %>% filter(site_code == 'lagoas.br' & plot == 20) %>% print(n=5
 ## there are 4 ties in this plot. I'm going to omit forb sp. as it is unidentified and unnecessary
 dominant_pop <- dominant_pop %>% filter(!Taxon  == 'FORB SP.')
 
-dominant_pop[dominant_pop$Taxon %in% c('NARDUS STRICTA','LOLIUM MULTIFLORUM',"ELYMUS SPICATUS"),]$local_lifespan <- 'PERENNIAL'
+dominant_pop[dominant_pop$Taxon %in% c('NARDUS STRICTA','LOLIUM MULTIFLORUM',"ELYMUS SPICATUS","CIRSIUM ARVENSE","KOBRESIA CAPILLIFOLIA"),]$local_lifespan <- 'PERENNIAL'
 dominant_pop[dominant_pop$Taxon %in% c('DAUCUS CAROTA'),]$local_lifespan <- 'BIENNIAL'
 
 unique(dominant_pop$Taxon[dominant_pop$local_lifespan == 'NULL']) # 2
@@ -472,7 +475,19 @@ sort(unique(working_coverdat$Taxon[working_coverdat$site_code == 'kbs.us']))
 dominant_pop %>% filter(Taxon == "DANTHONIA SPICATA") %>% distinct(site_code) %>% print(n=100)
 dominant_pop[dominant_pop$Taxon == "DANTHONIA SPICATA",]$local_provenance <- 'NAT'
 
-dominant_pop[dominant_pop$local_provenance == 'UNK',] # 23
+# "KOBRESIA CAPILLIFOLIA"   
+dominant_pop %>% filter(Taxon == "KOBRESIA CAPILLIFOLIA") %>% distinct(site_code) %>% print(n=100)
+dominant_pop[dominant_pop$Taxon == "KOBRESIA CAPILLIFOLIA",]$local_provenance <- 'NAT'
+
+
+# "CIRSIUM ARVENSE"
+dominant_pop %>% filter(Taxon == "CIRSIUM ARVENSE") %>% distinct(site_code) %>% print(n=100)
+dominant_pop[dominant_pop$Taxon == "CIRSIUM ARVENSE" & dominant_pop$site_code %in% c('badlau.de','lancaster.uk'),]$local_provenance <- 'NAT'
+dominant_pop[dominant_pop$Taxon == "CIRSIUM ARVENSE" & dominant_pop$site_code %in% c('smith.us'),]$local_provenance <- 'INT'
+
+dominant_pop[dominant_pop$local_provenance == 'UNK',] # 13
+dominant_pop[dominant_pop$local_provenance == 'NULL',] # 0
+
 
 unique(dominant_pop$functional_group)
 dominant_pop[dominant_pop$functional_group == 'NULL',]
@@ -491,7 +506,7 @@ unique(dominant_pop$Taxon[dominant_pop$functional_group == 'FORB']) #92
 ### 9126 with multiple initial dominants as of 2022-10-19
 ### 9118 with multiple initial dominants as of 2022-12-09
 ### 9208 with lagoas.br reinserted as of 2023-01-11
-
+### 9979 - data update for revision 2023-06-21
 
 ### add year 0 site richness
 
@@ -502,7 +517,6 @@ dominant_pop <- left_join(dominant_pop,
                                 distinct(Taxon) %>% 
                                 summarize(site_rich_0 = n()),
                               by = 'site_code')
-
 
 # write.csv(dominant_pop,
 #           paste0('/Users/wilf0020/Library/Mobile Documents/com~apple~CloudDocs/Documents/NutNet manuscripts/Initial dominance/Project/initial-dominance/Data/Dominants-through-time_',
@@ -515,10 +529,12 @@ site_tab <- comb %>% filter(site_code %in% dominant_pop$site_code) %>%
   group_by(site_code) %>%
   mutate(max_year = max(year_trt)) %>% filter(year_trt == max_year) %>%
   distinct(site_code, .keep_all = TRUE) %>% 
-  dplyr::select(site_name, site_code, continent, country, experiment_type, latitude, longitude, MAP_v2, MAP_VAR_v2) %>% 
+  dplyr::select(site_name, site_code, continent, country, experiment_type, max_year, latitude, longitude, MAP_v2, MAP_VAR_v2) %>% 
   left_join(.,dominant_pop %>% group_by(site_code) %>% distinct(site_code,.keep_all = TRUE) %>% dplyr::select(site_code,site_rich_0),
             by='site_code')
 
+site_tab
+
 # write_csv(site_tab,
-#          '/Users/wilf0020/Library/Mobile Documents/com~apple~CloudDocs/Documents/NutNet manuscripts/Initial dominance/Project/initial-dominance/Data/site-table_2023-01-11.csv'
+#          '/Users/wilf0020/Library/Mobile Documents/com~apple~CloudDocs/Documents/NutNet manuscripts/Initial dominance/Project/initial-dominance/Data/site-table_2023-06-29.csv'
 # )
